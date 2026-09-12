@@ -60,10 +60,12 @@ class ActivityReminderService
         $db = Database::connect();
         $due = $this->eligibleMembers($phase);
         $token = $this->getGlobal($db, 'TELEGRAM_TOKEN');
+        $adminId = $this->getGlobal($db, 'ID_ADMIN');
         $sent = 0;
         $skipped = 0;
         $failed = 0;
         $errors = [];
+        $sentMembers = [];
 
         foreach ($due as $member) {
             $memberPhase = $member['reminder_phase'];
@@ -84,12 +86,15 @@ class ActivityReminderService
                     'sent_at' => date('Y-m-d H:i:s'),
                 ]);
                 $sent++;
+                $sentMembers[] = $member;
             } else {
                 $failed++;
                 $errors[] = ($member['nama'] ?: $member['id_hfm']) . ': ' . ($response['description'] ?? 'Telegram gagal');
             }
         }
-        return ['due' => count($due), 'sent' => $sent, 'skipped' => $skipped, 'failed' => $failed, 'errors' => $errors];
+        $result = ['due' => count($due), 'sent' => $sent, 'skipped' => $skipped, 'failed' => $failed, 'errors' => $errors];
+        $this->sendAdminReport($token, $adminId, $result, $sentMembers);
+        return $result;
     }
 
     public function message(string $phase): string
@@ -103,17 +108,61 @@ class ActivityReminderService
         return trim((string) ($row['key_value'] ?? ''));
     }
 
-    private function sendTelegram(string $token, string $chatId, string $text): array
+    private function sendAdminReport(string $token, string $adminId, array $result, array $sentMembers): void
+    {
+        if ($adminId === '' || ($result['due'] === 0 && $result['failed'] === 0)) {
+            return;
+        }
+        $lines = [
+            '<b>📋 LAPORAN PENGINGAT AKTIVITAS MEMBER</b>',
+            'Waktu: ' . date('d-m-Y H:i:s'),
+            'Jatuh tempo: ' . $result['due'],
+            'Berhasil dikirim: ' . $result['sent'],
+            'Sudah pernah dikirim: ' . $result['skipped'],
+            'Gagal: ' . $result['failed'],
+        ];
+        foreach ($sentMembers as $member) {
+            $name = htmlspecialchars((string) ($member['nama'] ?: '-'), ENT_QUOTES, 'UTF-8');
+            $hfm = htmlspecialchars((string) $member['id_hfm'], ENT_QUOTES, 'UTF-8');
+            $telegram = htmlspecialchars((string) $member['id_telegram'], ENT_QUOTES, 'UTF-8');
+            $lines[] = "✅ {$name} | HFM: {$hfm} | <a href=\"tg://user?id={$telegram}\">Telegram</a>";
+        }
+        foreach ($result['errors'] as $error) {
+            $lines[] = '❌ ' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8');
+        }
+        $message = implode("\n", $lines);
+        $chunks = [];
+        $current = '';
+        foreach ($lines as $line) {
+            if ($current !== '' && strlen($current . "\n" . $line) > 3800) {
+                $chunks[] = $current;
+                $current = '';
+            }
+            $current .= ($current === '' ? '' : "\n") . $line;
+        }
+        if ($current !== '') {
+            $chunks[] = $current;
+        }
+        foreach ($chunks as $chunk) {
+            $this->sendTelegram($token, $adminId, $chunk, 'HTML');
+        }
+    }
+
+    private function sendTelegram(string $token, string $chatId, string $text, ?string $parseMode = null): array
     {
         if ($token === '') {
             return ['ok' => false, 'description' => 'TELEGRAM_TOKEN belum diatur di bot_globals'];
         }
         $ch = curl_init('https://api.telegram.org/bot' . $token . '/sendMessage');
+        $payload = ['chat_id' => $chatId, 'text' => $text];
+        if ($parseMode !== null) {
+            $payload['parse_mode'] = $parseMode;
+        }
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_POSTFIELDS => json_encode(['chat_id' => $chatId, 'text' => $text]),
+            CURLOPT_POSTFIELDS => json_encode($payload),
             CURLOPT_TIMEOUT => 20,
         ]);
         $raw = curl_exec($ch);
