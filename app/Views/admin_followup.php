@@ -2,7 +2,8 @@
 
 <?= $this->section('content') ?>
 <div class="card border-0 shadow-sm rounded-4 p-4 mt-2">
-    <h4 class="mb-4 text-primary fw-bold">Data Klien Pasif (>30 Hari)</h4>
+    <h4 class="mb-1 text-primary fw-bold">Data Klien Pasif (>30 Hari)</h4>
+    <p class="text-muted small mb-4">Status trading dan tanggal terakhir diambil langsung dari API HFM. Tidak ada kick atau hapus otomatis.</p>
 
     <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
@@ -10,8 +11,9 @@
                 <tr>
                     <th width="5%">No</th>
                     <th>Nama Klien</th>
-                    <th>Nomor WhatsApp</th>
-                    <th>Terakhir Aktif</th>
+                    <th>ID Trading</th>
+                    <th>Terakhir Trading API HFM</th>
+                    <th>Hari Tidak Trading</th>
                 </tr>
             </thead>
             <tbody>
@@ -20,8 +22,9 @@
                     <tr>
                         <td><?= $no++ ?></td>
                         <td class="fw-semibold"><?= esc($row['nama']) ?></td>
-                        <td><?= esc($row['no_wa']) ?></td>
-                        <td><span class="badge bg-danger rounded-pill px-3 py-2"><?= esc($row['last_active']) ?></span></td>
+                        <td><?= esc($row['id_hfm']) ?></td>
+                        <td><span class="badge bg-danger rounded-pill px-3 py-2"><?= esc($row['last_trade_display']) ?></span></td>
+                        <td><?= esc($row['inactive_days_api']) ?> hari</td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

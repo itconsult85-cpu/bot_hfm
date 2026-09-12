@@ -3,13 +3,13 @@
 namespace App\Controllers;
 
 use App\Models\ClientModel;
+use App\Libraries\ActivityReminderService;
 
 class Client extends BaseController
 {
     public function index()
     {
-        $model = new ClientModel();
-        $data['pasif'] = $model->getInactiveClients();
+        $data['pasif'] = (new ActivityReminderService())->inactiveMembersFromApi(30);
 
         return view('admin_followup', $data);
     }

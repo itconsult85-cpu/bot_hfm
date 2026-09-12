@@ -4,7 +4,6 @@ namespace App\Controllers;
 
 use App\Libraries\ActivityReminderService;
 use Config\Database;
-
 class ActivityReminder extends BaseController
 {
     private ActivityReminderService $service;
@@ -31,6 +30,7 @@ class ActivityReminder extends BaseController
         ));
     }
 
+    // Hanya dijalankan setelah admin menekan tombol hapus.
     public function remove($id)
     {
         $db = Database::connect();
@@ -38,7 +38,6 @@ class ActivityReminder extends BaseController
         if (!$member) {
             return redirect()->to('/activity-reminders')->with('pesan', 'Member tidak ditemukan.');
         }
-
         if (!empty($member['id_telegram']) && $member['id_telegram'] !== '-') {
             $this->postBot('/kick-telegram', ['id_telegram' => $member['id_telegram']]);
         }
@@ -49,7 +48,7 @@ class ActivityReminder extends BaseController
             'tipe_aktivitas' => 'keluar_di_remove',
         ]);
         $db->table('tb_member_vip')->where('id', (int) $id)->delete();
-        return redirect()->to('/activity-reminders')->with('pesan', 'Member dikeluarkan dari grup dan dihapus dari database.');
+        return redirect()->to('/activity-reminders')->with('pesan', 'Member berhasil di-kick dan dihapus oleh admin.');
     }
 
     private function postBot(string $path, array $payload): void
@@ -65,5 +64,5 @@ class ActivityReminder extends BaseController
         curl_exec($ch);
         curl_close($ch);
     }
-}
 
+}

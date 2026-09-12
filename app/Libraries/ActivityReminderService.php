@@ -8,6 +8,8 @@ use DateTimeZone;
 
 class ActivityReminderService
 {
+    private const HFM_API_KEY = '127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e';
+    private const HFM_BASE_URL = 'https://api.hfm-partners.com/api/clients/';
     private const MESSAGES = [
         'h3' => "📢 REMINDER AKTIVITAS MEMBER\n\nHalo teman-teman BO\$\$CUAN 👋\n\nKami ingin mengingatkan bahwa status keanggotaan di grup diperuntukkan bagi member yang aktif melakukan transaksi dan mengikuti aktivitas komunitas.\n\nBagi yang beberapa waktu terakhir belum melakukan transaksi, mohon untuk mulai kembali aktif. 🙏\n\n⏰ 3 hari ke depan akan dilakukan evaluasi aktivitas member.\n\nBagi member yang tetap tidak melakukan transaksi, akan kami hubungi kembali sebelum dilakukan penertiban grup.\n\nTerima kasih atas pengertiannya.\n🔥 Aktif bersama, cuan bersama!\n\nBO\$\$CUAN",
         'h1' => "⚠️ FINAL REMINDER MEMBER\n\nHalo member BO\$\$CUAN 👋\n\nKami mengingatkan kembali bahwa besok akan dilakukan evaluasi aktivitas member.\n\nBagi member yang belum melakukan transaksi/aktivitas, mohon segera kembali aktif agar status keanggotaan tetap dipertahankan.\n\n❗️ Member yang sampai batas waktu evaluasi belum melakukan transaksi akan masuk daftar penertiban dan dapat dikeluarkan dari grup.\n\nJika memang sedang memiliki kendala, silakan hubungi admin.\n\nTerima kasih atas perhatian dan kerja samanya. 🙏\n\n🔥 Jangan sampai kehilangan akses ke komunitas BO\$\$CUAN.",
@@ -16,23 +18,19 @@ class ActivityReminderService
 
     public function eligibleMembers(?string $phase = null): array
     {
-        $db = Database::connect();
-        $members = $db->table('tb_member_vip')
+        $members = Database::connect()->table('tb_member_vip')
             ->where('status', 'aktif')
             ->where('id_telegram IS NOT NULL', null, false)
             ->where('id_telegram !=', '')
             ->where('id_telegram !=', '-')
-            ->groupStart()
-                ->where('last_trade IS NULL', null, false)
-                ->orWhere('last_trade <= created_at', null, false)
-            ->groupEnd()
             ->orderBy('created_at', 'ASC')
             ->get()->getResultArray();
 
         $today = new DateTime('today', new DateTimeZone('Asia/Jakarta'));
         $result = [];
         foreach ($members as $member) {
-            if (empty($member['created_at'])) {
+            $member = $this->addHfmData($member);
+            if ($member === null || empty($member['created_at'])) {
                 continue;
             }
             $joined = new DateTime(substr($member['created_at'], 0, 10), new DateTimeZone('Asia/Jakarta'));
@@ -43,12 +41,42 @@ class ActivityReminderService
                 10 => 'final',
                 default => null,
             };
-            if ($phase !== null && $memberPhase !== $phase) {
+            if ($memberPhase === null || ($phase !== null && $memberPhase !== $phase)) {
                 continue;
             }
-            if ($memberPhase !== null) {
-                $member['reminder_phase'] = $memberPhase;
-                $member['days_since_join'] = $days;
+            // Hanya member yang menurut API HFM belum pernah trading.
+            if ($member['api_last_trade'] !== null) {
+                continue;
+            }
+            $member['reminder_phase'] = $memberPhase;
+            $member['days_since_join'] = $days;
+            $result[] = $member;
+        }
+        return $result;
+    }
+
+    /** Mengambil member aktif yang tidak trading minimal N hari dari API HFM. */
+    public function inactiveMembersFromApi(int $minimumDays = 30): array
+    {
+        $members = Database::connect()->table('tb_member_vip')
+            ->where('status', 'aktif')
+            ->orderBy('created_at', 'ASC')
+            ->get()->getResultArray();
+        $today = new DateTime('today', new DateTimeZone('Asia/Jakarta'));
+        $result = [];
+        foreach ($members as $member) {
+            $member = $this->addHfmData($member);
+            if ($member === null) {
+                continue;
+            }
+            $reference = $member['api_last_trade'] ?? $member['created_at'];
+            if (!$reference) {
+                continue;
+            }
+            $lastActivity = new DateTime(substr($reference, 0, 10), new DateTimeZone('Asia/Jakarta'));
+            $days = (int) $lastActivity->diff($today)->format('%r%a');
+            if ($days >= $minimumDays) {
+                $member['inactive_days_api'] = $days;
                 $result[] = $member;
             }
         }
@@ -78,7 +106,7 @@ class ActivityReminderService
                 continue;
             }
             $response = $this->sendTelegram($token, $member['id_telegram'], self::MESSAGES[$memberPhase]);
-            if ($response['ok']) {
+            if ($response['ok'] ?? false) {
                 $db->table('activity_reminder_logs')->insert([
                     'member_id' => $member['id'],
                     'phase' => $memberPhase,
@@ -102,6 +130,57 @@ class ActivityReminderService
         return self::MESSAGES[$phase] ?? '';
     }
 
+    private function addHfmData(array $member): ?array
+    {
+        $report = $this->fetchHfmReport((string) $member['id_hfm']);
+        if ($report === null || empty($report['id'])) {
+            return null;
+        }
+        $member['api_last_trade'] = $this->normaliseDate($report['last_trade'] ?? null);
+        $member['last_trade_display'] = $member['api_last_trade']
+            ? date('d M Y H:i', strtotime($member['api_last_trade']))
+            : 'Belum Trading';
+        $member['api_checked_at'] = date('Y-m-d H:i:s');
+        $member['api_name'] = $report['name'] ?? null;
+        return $member;
+    }
+
+    private function fetchHfmReport(string $idHfm): ?array
+    {
+        if ($idHfm === '') {
+            return null;
+        }
+        $ch = curl_init(self::HFM_BASE_URL . rawurlencode($idHfm) . '/report');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . self::HFM_API_KEY, 'Accept: application/json'],
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+        if (!$raw) {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        if (isset($decoded[0]) && is_array($decoded[0])) {
+            return $decoded[0];
+        }
+        if (isset($decoded['data']) && is_array($decoded['data'])) {
+            return $decoded['data'];
+        }
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function normaliseDate($value): ?string
+    {
+        if (!is_string($value) || !preg_match('/^20\d{2}-\d{2}-\d{2}/', $value)) {
+            return null;
+        }
+        $timestamp = strtotime($value);
+        return $timestamp === false ? null : date('Y-m-d H:i:s', $timestamp);
+    }
+
     private function getGlobal($db, string $key): string
     {
         $row = $db->table('bot_globals')->where('key_name', $key)->get()->getRowArray();
@@ -116,6 +195,7 @@ class ActivityReminderService
         $lines = [
             '<b>📋 LAPORAN PENGINGAT AKTIVITAS MEMBER</b>',
             'Waktu: ' . date('d-m-Y H:i:s'),
+            'Sumber status trading: API HFM',
             'Jatuh tempo: ' . $result['due'],
             'Berhasil dikirim: ' . $result['sent'],
             'Sudah pernah dikirim: ' . $result['skipped'],
@@ -130,7 +210,6 @@ class ActivityReminderService
         foreach ($result['errors'] as $error) {
             $lines[] = '❌ ' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8');
         }
-        $message = implode("\n", $lines);
         $chunks = [];
         $current = '';
         foreach ($lines as $line) {
@@ -153,11 +232,11 @@ class ActivityReminderService
         if ($token === '') {
             return ['ok' => false, 'description' => 'TELEGRAM_TOKEN belum diatur di bot_globals'];
         }
-        $ch = curl_init('https://api.telegram.org/bot' . $token . '/sendMessage');
         $payload = ['chat_id' => $chatId, 'text' => $text];
         if ($parseMode !== null) {
             $payload['parse_mode'] = $parseMode;
         }
+        $ch = curl_init('https://api.telegram.org/bot' . $token . '/sendMessage');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,

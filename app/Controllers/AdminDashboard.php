@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Libraries\ActivityReminderService;
 use CodeIgniter\Controller;
 
 class AdminDashboard extends BaseController
@@ -18,7 +19,6 @@ class AdminDashboard extends BaseController
 
         $hariIni = date('Y-m-d');
         $kemarin = date('Y-m-d', strtotime('-1 day'));
-        $batasPasif = date('Y-m-d', strtotime('-30 days'));
 
         $data['aktif_total'] = $db->table('tb_member_vip')->where('status', 'aktif')->countAllResults();
         $data['baru_hari_ini'] = $db->table('tb_member_vip')->like('created_at', $hariIni)->countAllResults();
@@ -27,10 +27,8 @@ class AdminDashboard extends BaseController
         $data['lepas_hari_ini'] = $db->table('tb_member_vip')->where('status', 'lepas_ib')->like('updated_at', $hariIni)->countAllResults();
         $data['lepas_kemarin']  = $db->table('tb_member_vip')->where('status', 'lepas_ib')->like('updated_at', $kemarin)->countAllResults();
 
-        $data['pasif_total'] = $db->table('tb_member_vip')
-            ->where('status', 'aktif')
-            ->where('last_trade <=', $batasPasif)
-            ->countAllResults();
+        // Status pasif harus memakai last_trade terbaru dari API HFM, bukan nilai cache lokal.
+        $data['pasif_total'] = count((new ActivityReminderService())->inactiveMembersFromApi(30));
 
         $data['members'] = $db->table('tb_member_vip')
             ->orderBy('created_at', 'DESC')

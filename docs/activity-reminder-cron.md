@@ -10,4 +10,4 @@ Tambahkan cron server berikut dengan timezone `Asia/Jakarta` atau set timezone P
 
 Sistem mengirimkan fase H-3 pada hari ke-7 setelah `created_at`, H-1 pada hari ke-9, dan pemberitahuan terakhir pada hari ke-10. Kandidat hanya member dengan `status = aktif`, `id_telegram` valid, serta `last_trade` kosong atau tidak lebih baru daripada waktu bergabung.
 
-Admin dapat membuka `/activity-reminders` untuk melihat kandidat hari berjalan. Tombol **Keluarkan & Hapus** mencatat aktivitas, meminta bot mengeluarkan member dari grup melalui endpoint bot yang sudah digunakan aplikasi, lalu menghapus data dari `tb_member_vip`.
+Admin dapat membuka `/activity-reminders` untuk melihat kandidat hari berjalan. Data status trading diambil langsung dari API HFM. Tidak ada kick atau delete otomatis. Jika admin menekan tombol **Kick & Hapus**, barulah aplikasi mencatat aktivitas, meminta bot mengeluarkan member dari grup melalui endpoint bot yang sudah digunakan aplikasi, lalu menghapus data dari `tb_member_vip`.
