@@ -27,6 +27,9 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
 
     // Admin Dashboard
     $routes->get('AdminDashboard', 'AdminDashboard::index');
+    $routes->get('activity-reminders', 'ActivityReminder::index');
+    $routes->post('activity-reminders/process', 'ActivityReminder::process');
+    $routes->get('activity-reminders/remove/(:num)', 'ActivityReminder::remove/$1');
     $routes->get('AdminDashboard/syncHfm/(:any)', 'AdminDashboard::syncHfm/$1');
     $routes->post('AdminDashboard/update-member', 'AdminDashboard::updateMember');
     $routes->post('admin/update-member', 'AdminDashboard::updateMember');

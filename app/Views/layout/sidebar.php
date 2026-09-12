@@ -10,7 +10,7 @@
 
     // Logika untuk mengecek apakah submenu Bot Settings atau Bot Data sedang aktif
     $isBotSettings = strpos($uri, 'bot-global') === 0 || strpos($uri, 'bot-flow') === 0 || strpos($uri, 'bot-faq') === 0;
-    $isBotData = strpos($uri, 'user-progress') === 0 || strpos($uri, 'chat-logs') === 0;
+    $isBotData = strpos($uri, 'user-progress') === 0 || strpos($uri, 'chat-logs') === 0 || strpos($uri, 'activity-reminders') === 0;
     ?>
 
     <div class="offcanvas-body p-0 py-3 overflow-y-auto">
@@ -27,6 +27,9 @@
         </a>
         <a href="<?= base_url('AdminDashboard/memberLogs') ?>" class="sidebar-menu-link <?= ($uri == 'AdminDashboard/memberLogs') ? 'active' : '' ?>">
             <i class="bi bi-clock-history"></i> Aktivitas Member
+        </a>
+        <a href="<?= base_url('activity-reminders') ?>" class="sidebar-menu-link <?= (strpos($uri, 'activity-reminders') === 0) ? 'active' : '' ?>">
+            <i class="bi bi-person-check-fill"></i> Evaluasi Aktivitas
         </a>
         <a href="<?= base_url('MediaAdmin') ?>" class="sidebar-menu-link <?= (strpos($uri, 'MediaAdmin') === 0) ? 'active' : '' ?>">
             <i class="bi bi-images"></i> Kelola Media

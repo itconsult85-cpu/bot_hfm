@@ -86,6 +86,9 @@ php_errors.log
 #-------------------------
 vendor/
 
+# Local database dumps may contain personal data and secrets.
+/hfm_admin_backup.sql
+
 #-------------------------
 # IDE / Development Files
 #-------------------------
