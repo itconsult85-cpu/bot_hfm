@@ -593,67 +593,11 @@ class Client extends BaseController
     // =========================================================
     public function updateSemuaLastTrade()
     {
-        // Menghindari timeout jika data di database sudah sangat banyak
         set_time_limit(0);
-
-        $db = \Config\Database::connect();
-
-        // Ambil member yang last_trade-nya NULL, atau 1970, atau 0000
-        $members = $db->table('tb_member_vip')
-            ->groupStart()
-            ->where('last_trade IS NULL')
-            ->orWhere('last_trade', '1970-01-01 00:00:00')
-            ->orWhere('last_trade', '0000-00-00 00:00:00')
-            ->groupEnd()
-            ->get()
-            ->getResultArray();
-
-        $api_key = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
-        $berhasil_diupdate = 0;
-
-        foreach ($members as $m) {
-            $id_hfm = $m['id_hfm'];
-
-            $url = "https://api.hfm-partners.com/api/clients/" . $id_hfm . "/report";
-
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Bearer ' . $api_key,
-                'Accept: application/json'
-            ]);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-
-            $response = curl_exec($ch);
-            $err = curl_error($ch);
-            curl_close($ch);
-
-            if (!$err && $response) {
-                $data = json_decode($response, true);
-
-                // ==========================================
-                // LOGIKA YANG BENAR ANTI 1970
-                // ==========================================
-                $raw_last_trade = $data['last_trade'] ?? 'N/A';
-
-                if (empty($raw_last_trade) || $raw_last_trade === 'N/A' || !preg_match('/^20\d{2}/', $raw_last_trade)) {
-                    $last_trade_update = '0000-00-00 00:00:00';
-                } else {
-                    $last_trade_update = date('Y-m-d H:i:s', strtotime($raw_last_trade));
-                }
-
-                $db->table('tb_member_vip')
-                    ->where('id_hfm', $id_hfm)
-                    ->update(['last_trade' => $last_trade_update]);
-
-                $berhasil_diupdate++;
-            }
-        }
-
+        $result = (new ActivityReminderService())->syncAllHfm();
         return $this->response->setJSON([
             'status' => 'sukses',
-            'pesan'  => "Berhasil mengecek " . count($members) . " data bermasalah. Total $berhasil_diupdate akun telah diupdate jadi format yang benar."
+            'pesan'  => "Berhasil sinkronisasi {$result['updated']} dari {$result['total']} member melalui API HFM. Gagal: {$result['failed']}."
         ]);
     }
 

@@ -10,12 +10,6 @@ class ActivityReminderService
 {
     private const HFM_API_KEY = '127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e';
     private const HFM_BASE_URL = 'https://api.hfm-partners.com/api/clients/';
-    private const MESSAGES = [
-        'h3' => "📢 REMINDER AKTIVITAS MEMBER\n\nHalo teman-teman BO\$\$CUAN 👋\n\nKami ingin mengingatkan bahwa status keanggotaan di grup diperuntukkan bagi member yang aktif melakukan transaksi dan mengikuti aktivitas komunitas.\n\nBagi yang beberapa waktu terakhir belum melakukan transaksi, mohon untuk mulai kembali aktif. 🙏\n\n⏰ 3 hari ke depan akan dilakukan evaluasi aktivitas member.\n\nBagi member yang tetap tidak melakukan transaksi, akan kami hubungi kembali sebelum dilakukan penertiban grup.\n\nTerima kasih atas pengertiannya.\n🔥 Aktif bersama, cuan bersama!\n\nBO\$\$CUAN",
-        'h1' => "⚠️ FINAL REMINDER MEMBER\n\nHalo member BO\$\$CUAN 👋\n\nKami mengingatkan kembali bahwa besok akan dilakukan evaluasi aktivitas member.\n\nBagi member yang belum melakukan transaksi/aktivitas, mohon segera kembali aktif agar status keanggotaan tetap dipertahankan.\n\n❗️ Member yang sampai batas waktu evaluasi belum melakukan transaksi akan masuk daftar penertiban dan dapat dikeluarkan dari grup.\n\nJika memang sedang memiliki kendala, silakan hubungi admin.\n\nTerima kasih atas perhatian dan kerja samanya. 🙏\n\n🔥 Jangan sampai kehilangan akses ke komunitas BO\$\$CUAN.",
-        'final' => "🚨 PEMBERITAHUAN TERAKHIR\n\nHalo teman-teman 👋\n\nHari ini kami melakukan evaluasi dan penertiban member berdasarkan aktivitas transaksi di komunitas.\n\nBagi member yang sampai batas waktu yang telah ditentukan belum melakukan transaksi/aktivitas, sesuai ketentuan akan dilakukan pengeluaran dari grup.\n\nMohon dipahami bahwa langkah ini dilakukan untuk menjaga grup tetap aktif dan diisi oleh member yang benar-benar mengikuti aktivitas BO\$\$CUAN.\n\n🙏 Terima kasih atas kebersamaan dan pengertiannya.\n\n🔥 BO\$\$CUAN — Aktif, Disiplin, Cuan Bersama!",
-    ];
-
     public function eligibleMembers(?string $phase = null): array
     {
         $members = Database::connect()->table('tb_member_vip')
@@ -35,12 +29,13 @@ class ActivityReminderService
             }
             $joined = new DateTime(substr($member['created_at'], 0, 10), new DateTimeZone('Asia/Jakarta'));
             $days = (int) $joined->diff($today)->format('%r%a');
-            $memberPhase = match ($days) {
-                7 => 'h3',
-                9 => 'h1',
-                10 => 'final',
-                default => null,
-            };
+            $memberPhase = null;
+            foreach ($this->phases() as $configuredPhase) {
+                if ((int) $configuredPhase['days_after_join'] === $days) {
+                    $memberPhase = $configuredPhase['phase_key'];
+                    break;
+                }
+            }
             if ($memberPhase === null || ($phase !== null && $memberPhase !== $phase)) {
                 continue;
             }
@@ -105,7 +100,13 @@ class ActivityReminderService
                 $skipped++;
                 continue;
             }
-            $response = $this->sendTelegram($token, $member['id_telegram'], self::MESSAGES[$memberPhase]);
+            $phase = $this->phaseByKey($memberPhase);
+            if (!$phase) {
+                $failed++;
+                $errors[] = $member['id_hfm'] . ': fase tidak ditemukan';
+                continue;
+            }
+            $response = $this->sendTelegram($token, $member['id_telegram'], $phase['message']);
             if ($response['ok'] ?? false) {
                 $db->table('activity_reminder_logs')->insert([
                     'member_id' => $member['id'],
@@ -127,7 +128,36 @@ class ActivityReminderService
 
     public function message(string $phase): string
     {
-        return self::MESSAGES[$phase] ?? '';
+        return (string) ($this->phaseByKey($phase)['message'] ?? '');
+    }
+
+    public function phases(): array
+    {
+        return Database::connect()->table('activity_reminder_phases')
+            ->where('is_active', 1)->orderBy('days_after_join', 'ASC')->get()->getResultArray();
+    }
+
+    public function syncAllHfm(): array
+    {
+        $db = Database::connect();
+        $members = $db->table('tb_member_vip')->select('id,id_hfm')->get()->getResultArray();
+        $updated = 0; $failed = 0;
+        foreach ($members as $member) {
+            $report = $this->fetchHfmReport((string) $member['id_hfm']);
+            if (!$report || empty($report['id'])) { $failed++; continue; }
+            $data = ['last_trade' => $this->normaliseDate($report['last_trade'] ?? null)];
+            if (!empty($report['name'])) { $data['nama'] = $report['name']; }
+            if (!empty($report['account_currency'])) { $data['currency'] = $report['account_currency']; }
+            $db->table('tb_member_vip')->where('id', $member['id'])->update($data);
+            $updated++;
+        }
+        return ['total' => count($members), 'updated' => $updated, 'failed' => $failed];
+    }
+
+    private function phaseByKey(string $key): ?array
+    {
+        foreach ($this->phases() as $phase) if ($phase['phase_key'] === $key) return $phase;
+        return null;
     }
 
     private function addHfmData(array $member): ?array

@@ -30,6 +30,10 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->get('activity-reminders', 'ActivityReminder::index');
     $routes->post('activity-reminders/process', 'ActivityReminder::process');
     $routes->get('activity-reminders/remove/(:num)', 'ActivityReminder::remove/$1');
+    $routes->get('activity-reminder-phases', 'ActivityReminderPhase::index');
+    $routes->post('activity-reminder-phases/store', 'ActivityReminderPhase::store');
+    $routes->post('activity-reminder-phases/update/(:num)', 'ActivityReminderPhase::update/$1');
+    $routes->get('activity-reminder-phases/delete/(:num)', 'ActivityReminderPhase::delete/$1');
     $routes->get('AdminDashboard/syncHfm/(:any)', 'AdminDashboard::syncHfm/$1');
     $routes->post('AdminDashboard/update-member', 'AdminDashboard::updateMember');
     $routes->post('admin/update-member', 'AdminDashboard::updateMember');
