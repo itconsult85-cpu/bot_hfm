@@ -10,3 +10,8 @@ CREATE TABLE IF NOT EXISTS `activity_reminder_logs` (
   UNIQUE KEY `uq_activity_reminder_member_phase` (`member_id`, `phase`),
   KEY `idx_activity_reminder_sent_at` (`sent_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Kolom last_trade pada database aktual nullable; jangan simpan tanggal semu.
+UPDATE `tb_member_vip`
+SET `last_trade` = NULL
+WHERE `last_trade` IN ('0000-00-00 00:00:00', '1970-01-01 00:00:00');
