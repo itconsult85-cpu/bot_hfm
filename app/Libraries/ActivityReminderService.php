@@ -12,6 +12,11 @@ class ActivityReminderService
     private const HFM_BASE_URL = 'https://api.hfm-partners.com/api/clients/';
     public function eligibleMembers(?string $phase = null): array
     {
+        // Loop di bawah ini memanggil API HFM satu per satu untuk tiap member aktif,
+        // sehingga total waktu bisa melebihi max_execution_time default/php.ini.
+        // Method ini memang berjalan sebagai proses batch (cron), jadi limit waktu dilepas.
+        set_time_limit(0);
+
         $members = Database::connect()->table('tb_member_vip')
             ->where('status', 'aktif')
             ->where('id_telegram IS NOT NULL', null, false)
@@ -53,6 +58,9 @@ class ActivityReminderService
     /** Mengambil member aktif yang tidak trading minimal N hari dari API HFM. */
     public function inactiveMembersFromApi(int $minimumDays = 30): array
     {
+        // Sama seperti eligibleMembers(): loop memanggil API HFM per member.
+        set_time_limit(0);
+
         $members = Database::connect()->table('tb_member_vip')
             ->where('status', 'aktif')
             ->orderBy('created_at', 'ASC')
@@ -139,15 +147,27 @@ class ActivityReminderService
 
     public function syncAllHfm(): array
     {
+        // Loop memanggil API HFM untuk SEMUA member, jadi rawan kena
+        // Maximum execution time juga. Lepas limit waktu untuk proses batch ini.
+        set_time_limit(0);
+
         $db = Database::connect();
         $members = $db->table('tb_member_vip')->select('id,id_hfm')->get()->getResultArray();
-        $updated = 0; $failed = 0;
+        $updated = 0;
+        $failed = 0;
         foreach ($members as $member) {
             $report = $this->fetchHfmReport((string) $member['id_hfm']);
-            if (!$report || empty($report['id'])) { $failed++; continue; }
+            if (!$report || empty($report['id'])) {
+                $failed++;
+                continue;
+            }
             $data = ['last_trade' => $this->normaliseDate($report['last_trade'] ?? null)];
-            if (!empty($report['name'])) { $data['nama'] = $report['name']; }
-            if (!empty($report['account_currency'])) { $data['currency'] = $report['account_currency']; }
+            if (!empty($report['name'])) {
+                $data['nama'] = $report['name'];
+            }
+            if (!empty($report['account_currency'])) {
+                $data['currency'] = $report['account_currency'];
+            }
             $db->table('tb_member_vip')->where('id', $member['id'])->update($data);
             $updated++;
         }
