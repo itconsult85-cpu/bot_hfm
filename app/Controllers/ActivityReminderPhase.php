@@ -2,12 +2,14 @@
 
 namespace App\Controllers;
 
+use App\Libraries\ActivityReminderService;
 use Config\Database;
 
 class ActivityReminderPhase extends BaseController
 {
     public function index()
     {
+        (new ActivityReminderService())->phases();
         return view('activity_reminder_phases/index', [
             'title' => 'Pengaturan Fase Pengingat',
             'phases' => Database::connect()->table('activity_reminder_phases')->orderBy('days_after_join', 'ASC')->get()->getResultArray(),

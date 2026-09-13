@@ -142,8 +142,45 @@ class ActivityReminderService
 
     public function phases(): array
     {
+        $this->ensureReminderTables();
         return Database::connect()->table('activity_reminder_phases')
             ->where('is_active', 1)->orderBy('days_after_join', 'ASC')->get()->getResultArray();
+    }
+
+    private function ensureReminderTables(): void
+    {
+        $db = Database::connect();
+        $db->query("CREATE TABLE IF NOT EXISTS `activity_reminder_logs` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `member_id` INT NOT NULL,
+            `phase` VARCHAR(50) NOT NULL,
+            `telegram_id` VARCHAR(50) NOT NULL,
+            `sent_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uq_activity_reminder_member_phase` (`member_id`, `phase`),
+            KEY `idx_activity_reminder_sent_at` (`sent_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+        $db->query("CREATE TABLE IF NOT EXISTS `activity_reminder_phases` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `phase_key` VARCHAR(50) NOT NULL,
+            `phase_name` VARCHAR(100) NOT NULL,
+            `days_after_join` INT UNSIGNED NOT NULL,
+            `message` TEXT NOT NULL,
+            `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uq_activity_reminder_phase_key` (`phase_key`),
+            UNIQUE KEY `uq_activity_reminder_days` (`days_after_join`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+        $count = $db->table('activity_reminder_phases')->countAllResults();
+        if ($count === 0) {
+            $db->table('activity_reminder_phases')->insertBatch([
+                ['phase_key' => 'h3', 'phase_name' => 'H-3 Reminder', 'days_after_join' => 7, 'message' => '📢 REMINDER AKTIVITAS MEMBER\n\nHalo teman-teman BO$$CUAN 👋\n\nMohon mulai kembali aktif melakukan transaksi.\n\n⏰ 3 hari ke depan akan dilakukan evaluasi aktivitas member.\n\nBO$$CUAN', 'is_active' => 1],
+                ['phase_key' => 'h1', 'phase_name' => 'H-1 Final Reminder', 'days_after_join' => 9, 'message' => '⚠️ FINAL REMINDER MEMBER\n\nBesok akan dilakukan evaluasi aktivitas member.\n\nMohon segera kembali aktif agar status keanggotaan tetap dipertahankan.\n\nBO$$CUAN', 'is_active' => 1],
+                ['phase_key' => 'final', 'phase_name' => 'Hari Evaluasi', 'days_after_join' => 10, 'message' => '🚨 PEMBERITAHUAN TERAKHIR\n\nHari ini dilakukan evaluasi aktivitas member.\n\nTerima kasih atas kebersamaan dan pengertiannya.\n\nBO$$CUAN', 'is_active' => 1],
+            ]);
+        }
     }
 
     public function syncAllHfm(): array
