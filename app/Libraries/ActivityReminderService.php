@@ -23,10 +23,12 @@ class ActivityReminderService
         $today = new DateTime('today', new DateTimeZone('Asia/Jakarta'));
         $result = [];
         foreach ($members as $member) {
-            $member = $this->addHfmData($member);
-            if ($member === null || empty($member['created_at'])) {
+            if (empty($member['created_at'])) {
                 continue;
             }
+            $member['api_last_trade'] = $this->normaliseDate($member['last_trade'] ?? null);
+            $member['last_trade_display'] = $member['api_last_trade']
+                ? date('d M Y H:i', strtotime($member['api_last_trade'])) : 'Belum Trading';
             $joined = new DateTime(substr($member['created_at'], 0, 10), new DateTimeZone('Asia/Jakarta'));
             $days = (int) $joined->diff($today)->format('%r%a');
             $memberPhase = null;
@@ -60,10 +62,9 @@ class ActivityReminderService
         $today = new DateTime('today', new DateTimeZone('Asia/Jakarta'));
         $result = [];
         foreach ($members as $member) {
-            $member = $this->addHfmData($member);
-            if ($member === null) {
-                continue;
-            }
+            $member['api_last_trade'] = $this->normaliseDate($member['last_trade'] ?? null);
+            $member['last_trade_display'] = $member['api_last_trade']
+                ? date('d M Y H:i', strtotime($member['api_last_trade'])) : 'Belum Trading';
             $reference = $member['api_last_trade'] ?? $member['created_at'];
             if (!$reference) {
                 continue;
@@ -142,16 +143,54 @@ class ActivityReminderService
         $db = Database::connect();
         $members = $db->table('tb_member_vip')->select('id,id_hfm')->get()->getResultArray();
         $updated = 0; $failed = 0;
-        foreach ($members as $member) {
-            $report = $this->fetchHfmReport((string) $member['id_hfm']);
+        foreach (array_chunk($members, 25) as $batch) {
+            $reports = $this->fetchHfmReportsBatch($batch);
+            foreach ($batch as $member) {
+            $report = $reports[(string) $member['id_hfm']] ?? null;
             if (!$report || empty($report['id'])) { $failed++; continue; }
             $data = ['last_trade' => $this->normaliseDate($report['last_trade'] ?? null)];
             if (!empty($report['name'])) { $data['nama'] = $report['name']; }
             if (!empty($report['account_currency'])) { $data['currency'] = $report['account_currency']; }
             $db->table('tb_member_vip')->where('id', $member['id'])->update($data);
             $updated++;
+            }
         }
         return ['total' => count($members), 'updated' => $updated, 'failed' => $failed];
+    }
+
+    private function fetchHfmReportsBatch(array $members): array
+    {
+        $multi = curl_multi_init();
+        $handles = [];
+        foreach ($members as $member) {
+            $id = (string) $member['id_hfm'];
+            if ($id === '') continue;
+            $ch = curl_init(self::HFM_BASE_URL . rawurlencode($id) . '/report');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . self::HFM_API_KEY, 'Accept: application/json'],
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_TIMEOUT => 10,
+            ]);
+            curl_multi_add_handle($multi, $ch);
+            $handles[$id] = $ch;
+        }
+        do {
+            $status = curl_multi_exec($multi, $running);
+            if ($running) curl_multi_select($multi, 1.0);
+        } while ($running && $status === CURLM_OK);
+        $reports = [];
+        foreach ($handles as $id => $ch) {
+            $decoded = json_decode((string) curl_multi_getcontent($ch), true);
+            if (isset($decoded[0]) && is_array($decoded[0])) $decoded = $decoded[0];
+            elseif (isset($decoded['data']) && is_array($decoded['data'])) $decoded = $decoded['data'];
+            if (is_array($decoded)) $reports[$id] = $decoded;
+            curl_multi_remove_handle($multi, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($multi);
+        return $reports;
     }
 
     private function phaseByKey(string $key): ?array
