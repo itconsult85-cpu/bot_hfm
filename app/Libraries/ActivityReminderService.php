@@ -154,21 +154,36 @@ class ActivityReminderService
 
         $db = Database::connect();
         $members = $db->table('tb_member_vip')->select('id,id_hfm')->get()->getResultArray();
-        $updated = 0; $failed = 0;
-        foreach ($members as $member) {
-            $report = $this->fetchHfmReport((string) $member['id_hfm']);
-            if (!$report || empty($report['id'])) { $failed++; continue; }
-            $data = ['last_trade' => $this->normaliseDate($report['last_trade'] ?? null)];
-            if (!empty($report['name'])) {
-                $data['nama'] = $report['name'];
-            }
-            if (!empty($report['account_currency'])) {
-                $data['currency'] = $report['account_currency'];
-            }
-            $db->table('tb_member_vip')->where('id', $member['id'])->update($data);
-            $updated++;
+        $updated = 0;
+        $failed = 0;
+
+        foreach (array_chunk($members, 25) as $batch) {
+            $reports = $this->fetchHfmReportsBatch($batch);
+
+            foreach ($batch as $member) {
+                $report = $reports[(string) $member['id_hfm']] ?? null;
+                if (!$report || empty($report['id'])) {
+                    $failed++;
+                    continue;
+                }
+
+                $data = [
+                    'last_trade' => $this->normaliseDate($report['last_trade'] ?? null),
+                ];
+                if (!empty($report['name'])) {
+                    $data['nama'] = $report['name'];
+                }
+                if (!empty($report['account_currency'])) {
+                    $data['currency'] = $report['account_currency'];
+                }
+
+                $db->table('tb_member_vip')
+                    ->where('id', $member['id'])
+                    ->update($data);
+                $updated++;
             }
         }
+
         return ['total' => count($members), 'updated' => $updated, 'failed' => $failed];
     }
 
