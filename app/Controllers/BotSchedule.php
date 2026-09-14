@@ -68,6 +68,10 @@ class BotSchedule extends BaseController
         $exitCode = 1;
         exec($command, $output, $exitCode);
 
+        log_message('error', 'CMD: ' . $command);
+        log_message('error', 'EXIT: ' . $exitCode);
+        log_message('error', 'OUTPUT: ' . implode('|', $output));
+
         if ($exitCode !== 0) {
             log_message('error', 'Gagal restart bot_tele_hfm: ' . implode("\n", $output));
             return $this->response->setStatusCode(500)->setJSON([
