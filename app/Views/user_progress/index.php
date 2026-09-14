@@ -57,6 +57,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th class="py-3 border-bottom-0">No</th>
                         <th class="py-3 border-bottom-0 ps-4">Telegram ID</th>
                         <th class="py-3 border-bottom-0">Nama User</th>
                         <th class="py-3 border-bottom-0 text-center">Tahap Saat Ini</th>
@@ -67,7 +68,7 @@
                 <tbody>
                     <?php if (empty($progress)): ?>
                         <tr>
-                            <td colspan="5" class="text-center py-5">
+                            <td colspan="6" class="text-center py-5">
                                 <div class="empty-state">
                                     <i class="bi bi-person-x text-muted" style="font-size: 3rem;"></i>
                                     <h6 class="fw-bold mt-3">Belum Ada Data Progress</h6>
@@ -76,8 +77,9 @@
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($progress as $p): ?>
+                        <?php $no = 1; foreach ($progress as $p): ?>
                             <tr>
+                                <td><?= $no++ ?></td>
                                 <td class="fw-semibold ps-4 text-secondary">
                                     <i class="bi bi-telegram text-primary me-1"></i> <?= esc($p['user_id']) ?>
                                 </td>

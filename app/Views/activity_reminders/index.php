@@ -16,13 +16,13 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle">
-            <thead class="table-light"><tr><th>Nama</th><th>ID Trading</th><th>ID Telegram</th><th>Bergabung</th><th>Terakhir Trading API HFM</th><th>Fase</th><th>Aksi Admin</th></tr></thead>
+            <thead class="table-light"><tr><th>No</th><th>Nama</th><th>ID Trading</th><th>ID Telegram</th><th>Bergabung</th><th>Terakhir Trading API HFM</th><th>Fase</th><th>Aksi Admin</th></tr></thead>
             <tbody>
             <?php if (empty($members)): ?>
-                <tr><td colspan="7" class="text-center text-muted py-4">Tidak ada member yang jatuh tempo hari ini.</td></tr>
-            <?php else: foreach ($members as $member): ?>
+                <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada member yang jatuh tempo hari ini.</td></tr>
+            <?php else: $no = 1; foreach ($members as $member): ?>
                 <tr>
-                    <td class="fw-semibold"><?= esc($member['nama'] ?: '-') ?></td>
+                    <td><?= $no++ ?></td><td class="fw-semibold"><?= esc($member['nama'] ?: '-') ?></td>
                     <td><?= esc($member['id_hfm']) ?></td>
                     <td><i class="bi bi-telegram text-info"></i> <?= esc($member['id_telegram']) ?></td>
                     <td><?= esc(date('d M Y', strtotime($member['created_at']))) ?></td>

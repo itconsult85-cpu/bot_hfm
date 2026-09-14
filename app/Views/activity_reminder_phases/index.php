@@ -7,9 +7,9 @@
     </div>
     <?php if ($msg = session()->getFlashdata('pesan')): ?><div class="alert alert-success"><?= esc($msg) ?></div><?php endif; ?>
     <div class="alert alert-light border small">Fase aktif akan diproses tepat pada jumlah hari setelah <code>created_at</code>. Anda bebas menghapus fase, menambah fase baru, atau mengubah urutannya berdasarkan hari.</div>
-    <div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr><th>Key</th><th>Nama</th><th>Hari ke-</th><th>Status</th><th>Pesan</th><th>Aksi</th></tr></thead><tbody>
-    <?php foreach ($phases as $phase): ?><tr>
-        <td><code><?= esc($phase['phase_key']) ?></code></td><td><?= esc($phase['phase_name']) ?></td><td><?= esc($phase['days_after_join']) ?></td>
+    <div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr><th>No</th><th>Key</th><th>Nama</th><th>Hari ke-</th><th>Status</th><th>Pesan</th><th>Aksi</th></tr></thead><tbody>
+    <?php $no = 1; foreach ($phases as $phase): ?><tr>
+        <td><?= $no++ ?></td><td><code><?= esc($phase['phase_key']) ?></code></td><td><?= esc($phase['phase_name']) ?></td><td><?= esc($phase['days_after_join']) ?></td>
         <td><?= $phase['is_active'] ? '<span class="badge bg-success">Aktif</span>' : '<span class="badge bg-secondary">Nonaktif</span>' ?></td>
         <td><div style="white-space:pre-wrap;max-width:520px;max-height:100px;overflow:auto"><?= esc($phase['message']) ?></div></td>
         <td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-warning" onclick='editPhase(<?= json_encode($phase, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP) ?>)'><i class="bi bi-pencil"></i></button><a class="btn btn-sm btn-outline-danger" href="<?= base_url('activity-reminder-phases/delete/' . $phase['id']) ?>" onclick="return confirm('Hapus fase ini?')"><i class="bi bi-trash"></i></a></div></td>

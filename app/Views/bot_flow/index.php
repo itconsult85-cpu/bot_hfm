@@ -26,6 +26,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th width="5%" class="text-center py-3 border-bottom-0">No</th>
                         <th width="8%" class="text-center py-3 border-bottom-0">Step</th>
                         <th width="15%" class="py-3 border-bottom-0">Nama Step</th>
                         <th width="20%" class="py-3 border-bottom-0">Keywords Trigger</th>
@@ -36,7 +37,7 @@
                 <tbody>
                     <?php if (empty($flows)): ?>
                         <tr>
-                            <td colspan="5" class="text-center py-5">
+                            <td colspan="6" class="text-center py-5">
                                 <div class="empty-state">
                                     <i class="bi bi-diagram-2 text-muted" style="font-size: 3rem;"></i>
                                     <h6 class="fw-bold mt-3">Belum Ada Alur Pendaftaran</h6>
@@ -45,8 +46,9 @@
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($flows as $f): ?>
+                        <?php $no = 1; foreach ($flows as $f): ?>
                             <tr>
+                                <td class="text-center text-muted"><?= $no++ ?></td>
                                 <td class="text-center">
                                     <span class="badge bg-primary rounded-pill px-3 py-2 fs-6 shadow-sm">
                                         <?= esc($f['step_level']) ?>
