@@ -37,6 +37,7 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->get('bot-schedules', 'BotSchedule::index');
     $routes->post('bot-schedules/update/(:num)', 'BotSchedule::update/$1');
     $routes->post('bot-schedules/restart-bot', 'BotSchedule::restartBot');
+    $routes->post('bot-schedules/send-report', 'BotSchedule::sendReport');
     $routes->get('AdminDashboard/syncHfm/(:any)', 'AdminDashboard::syncHfm/$1');
     $routes->post('AdminDashboard/update-member', 'AdminDashboard::updateMember');
     $routes->post('admin/update-member', 'AdminDashboard::updateMember');

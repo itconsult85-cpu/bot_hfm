@@ -87,6 +87,37 @@ class BotSchedule extends BaseController
         return $this->response->setJSON(['message' => 'bot_tele_hfm berhasil direstart.', 'output' => implode(' ', $output)]);
     }
 
+    public function sendReport()
+    {
+        $tokenRow = Database::connect()->table('bot_globals')
+            ->select('key_value')
+            ->where('key_name', 'BOT_CONTROL_TOKEN')
+            ->get()->getRowArray();
+        $token = (string) ($tokenRow['key_value'] ?? '');
+        if ($token === '') {
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'BOT_CONTROL_TOKEN belum dikonfigurasi.']);
+        }
+
+        $ch = curl_init('http://127.0.0.1:3000/api/send-daily-report');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => json_encode(['token' => $token]),
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 90,
+        ]);
+        $raw = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $data = json_decode($raw ?: '', true);
+        if ($curlError || $httpCode < 200 || $httpCode >= 300) {
+            return $this->response->setStatusCode(502)->setJSON(['error' => 'Gagal mengirim report manual dari bot.', 'detail' => $curlError ?: ($data['error'] ?? 'HTTP ' . $httpCode)]);
+        }
+        return $this->response->setJSON($data ?: ['message' => 'Report manual berhasil dikirim.']);
+    }
+
     private function ensureTable(): void
     {
         $db = Database::connect();

@@ -95,12 +95,23 @@ class Client extends BaseController
             ->get()->getRowArray();
         $lepas_ib = $lepasQuery['total'] ?? 0;
 
+        // Total client/user aktif saat laporan dibuat berdasarkan database.
+        $aktifQuery = $db->table('tb_member_vip')
+            ->select('COUNT(DISTINCT id_telegram) as total')
+            ->where('status', 'aktif')
+            ->where('id_telegram !=', '')
+            ->where('id_telegram !=', '-')
+            ->where('id_telegram IS NOT NULL')
+            ->get()->getRowArray();
+        $total_aktif = (int) ($aktifQuery['total'] ?? 0);
+
         return $this->response->setJSON([
             'status' => 'ok',
             'data' => [
                 'masuk' => $masuk,
                 'keluar_sendiri' => $keluar_sendiri,
                 'lepas_ib' => $lepas_ib,
+                'total_aktif' => $total_aktif,
                 'debug_waktu' => "Data ditarik dari $startWaktu sampai $endWaktu"
             ]
         ]);

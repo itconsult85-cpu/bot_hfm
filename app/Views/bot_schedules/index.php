@@ -6,7 +6,10 @@
             <h4 class="fw-bold text-primary mb-1">Jadwal Pengiriman Bot</h4>
             <p class="text-muted mb-0">Timezone: <strong>Asia/Jakarta (WIB)</strong>. Perubahan dibaca bot otomatis tanpa edit kode.</p>
         </div>
-        <button class="btn btn-warning rounded-pill" onclick="restartTelegramBot()"><i class="bi bi-arrow-clockwise me-1"></i> Restart bot_tele_hfm</button>
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-primary rounded-pill" onclick="sendDailyReport()"><i class="bi bi-send me-1"></i> Kirim Report Sekarang</button>
+            <button class="btn btn-warning rounded-pill" onclick="restartTelegramBot()"><i class="bi bi-arrow-clockwise me-1"></i> Restart bot_tele_hfm</button>
+        </div>
     </div>
     <?php if (session()->getFlashdata('pesan')): ?><div class="alert alert-info"><?= esc(session()->getFlashdata('pesan')) ?></div><?php endif; ?>
     <div class="alert alert-light border small">Laporan harian dan evaluasi aktivitas memiliki jadwal terpisah. Menonaktifkan jadwal hanya menghentikan proses tersebut, tidak menghapus fase atau data member.</div>
@@ -54,6 +57,32 @@ async function restartTelegramBot() {
         }
         await showAppAlert(data.message || 'bot_tele_hfm berhasil direstart.');
     } catch (error) { await showAppAlert('Restart gagal: ' + error.message); }
+}
+
+async function sendDailyReport() {
+    const approved = await showAppConfirm('Kirim report harian berdasarkan data yang tersimpan di database sekarang?', {
+        title: 'Kirim report manual',
+        confirmText: 'Kirim sekarang'
+    });
+    if (!approved) return;
+    try {
+        const response = await fetch('<?= base_url('bot-schedules/send-report') ?>', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                '<?= csrf_header() ?>': '<?= csrf_hash() ?>',
+                'Accept': 'application/json'
+            }
+        });
+        const raw = await response.text();
+        let data;
+        try { data = JSON.parse(raw); } catch (_) { data = { error: raw.substring(0, 500) }; }
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        await showAppAlert(data.message || 'Report harian berhasil dikirim.');
+    } catch (error) {
+        await showAppAlert('Pengiriman report gagal: ' + error.message);
+    }
 }
 </script>
 <?= $this->endSection() ?>
