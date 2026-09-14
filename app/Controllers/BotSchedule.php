@@ -56,9 +56,9 @@ class BotSchedule extends BaseController
                 'error' => 'Fungsi exec() PHP dinonaktifkan di server. Hapus exec dari disable_functions lalu restart Apache.',
             ]);
         }
-        $pm2 = is_executable('/usr/bin/pm2') ? '/usr/bin/pm2' : trim((string) shell_exec('command -v pm2'));
-        if ($pm2 === '') {
-            return $this->response->setStatusCode(500)->setJSON(['error' => 'PM2 tidak ditemukan di server.']);
+        $pm2 = '/usr/bin/pm2';
+        if (!is_file($pm2)) {
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'File PM2 tidak ditemukan di /usr/bin/pm2.']);
         }
         $command = sprintf(
             '/usr/bin/sudo -n -u bonichi %s restart bot_tele_hfm --update-env 2>&1',
