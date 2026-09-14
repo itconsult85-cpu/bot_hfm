@@ -44,13 +44,24 @@ class Client extends BaseController
     {
         $db = \Config\Database::connect();
 
-        // Mengambil rentang waktu hari ini full
-        $hariIni = date('Y-m-d');
-        $kemarin = date('Y-m-d', strtotime('-1 day'));
+        // Satu hari laporan mengikuti waktu WIB: 04:05:00 sampai 04:04:59
+        // hari berikutnya. Contoh report 15 September:
+        // 14 September 04:05:00 sampai 15 September 04:04:59.
+        $zonaWib = new \DateTimeZone('Asia/Jakarta');
+        $sekarangWib = new \DateTime('now', $zonaWib);
+        $batasHariIni = new \DateTime($sekarangWib->format('Y-m-d') . ' 04:05:00', $zonaWib);
 
-        // Rentang Waktu: 04:00 Pagi KEMARIN sampai 03:59 Pagi HARI INI
-        $startWaktu = $kemarin . ' 04:00:00';
-        $endWaktu   = $hariIni . ' 03:59:59';
+        // Jika report/manual dipanggil sebelum 04:05, periode aktif masih
+        // periode kalender sebelumnya.
+        $tanggalAkhir = clone $sekarangWib;
+        if ($sekarangWib < $batasHariIni) {
+            $tanggalAkhir->modify('-1 day');
+        }
+
+        $tanggalMulai = clone $tanggalAkhir;
+        $tanggalMulai->modify('-1 day');
+        $startWaktu = $tanggalMulai->format('Y-m-d') . ' 04:05:00';
+        $endWaktu   = $tanggalAkhir->format('Y-m-d') . ' 04:04:59';
 
         // 1. REKAP MEMBER MASUK (Berdasarkan ID Telegram Unik)
         $masukQuery = $db->table('tb_member_logs')
