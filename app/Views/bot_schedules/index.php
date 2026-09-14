@@ -44,7 +44,10 @@ async function restartTelegramBot() {
         const raw = await response.text();
         let data;
         try { data = JSON.parse(raw); } catch (_) { data = { error: raw.substring(0, 500) }; }
-        if (!response.ok) throw new Error(data.error || data.detail || `HTTP ${response.status}`);
+        if (!response.ok) {
+            const detail = data.detail ? `\nDetail: ${data.detail}` : '';
+            throw new Error((data.error || `HTTP ${response.status}`) + detail);
+        }
         alert(data.message || 'bot_tele_hfm berhasil direstart.');
     } catch (error) { alert('Restart gagal: ' + error.message); }
 }
