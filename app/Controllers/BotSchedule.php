@@ -56,16 +56,14 @@ class BotSchedule extends BaseController
                 'error' => 'Fungsi exec() PHP dinonaktifkan di server. Hapus exec dari disable_functions lalu restart Apache.',
             ]);
         }
-        $restartScript = '/usr/local/sbin/hfm-restart-bot';
-        if (!is_file($restartScript) || !is_executable($restartScript)) {
+        $service = 'hfm-bot-restart.service';
+        if (!is_file('/etc/systemd/system/' . $service)) {
             return $this->response->setStatusCode(500)->setJSON([
-                'error' => 'Fitur restart bot hanya tersedia di VPS. Wrapper belum terpasang di /usr/local/sbin/hfm-restart-bot pada server ini.',
-                'detail' => 'Pasang deploy/hfm-restart-bot di VPS. Jangan memasang wrapper produksi pada localhost.',
+                'error' => 'Service restart bot belum terpasang di VPS.',
+                'detail' => 'Pasang deploy/hfm-bot-restart.service ke /etc/systemd/system/.',
             ]);
         }
-        // Gunakan command literal yang sama dengan aturan sudoers; wrapper hanya
-        // boleh merestart bot_tele_hfm dan tidak menerima argumen tambahan.
-        $command = '/usr/bin/sudo -n -u bonichi ' . $restartScript . ' 2>&1';
+        $command = '/usr/bin/sudo -n /usr/bin/systemctl restart ' . $service . ' 2>&1';
         $output = [];
         $exitCode = 1;
         exec($command, $output, $exitCode);

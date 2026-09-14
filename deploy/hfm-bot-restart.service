@@ -1,0 +1,11 @@
+[Unit]
+Description=Restart Telegram HFM bot via PM2
+
+[Service]
+Type=oneshot
+User=bonichi
+Group=bonichi
+WorkingDirectory=/home/bonichi/bot_hfm
+Environment=HOME=/home/bonichi
+Environment=PM2_HOME=/home/bonichi/.pm2
+ExecStart=/usr/bin/pm2 restart bot_tele_hfm --update-env
