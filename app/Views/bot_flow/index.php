@@ -70,7 +70,7 @@
                                         <a href="<?= base_url('bot-flow/edit/' . $f['id']) ?>" class="btn btn-sm btn-light border text-warning rounded-circle" title="Edit">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <a href="<?= base_url('bot-flow/delete/' . $f['id']) ?>" class="btn btn-sm btn-light border text-danger rounded-circle" onclick="return confirm('Yakin ingin menghapus step ini?')" title="Hapus">
+                                        <a href="<?= base_url('bot-flow/delete/' . $f['id']) ?>" class="btn btn-sm btn-light border text-danger rounded-circle" data-confirm="Yakin ingin menghapus step ini?" data-confirm-title="Hapus step bot" data-confirm-button="Ya, hapus" title="Hapus">
                                             <i class="bi bi-trash"></i>
                                         </a>
                                     </div>

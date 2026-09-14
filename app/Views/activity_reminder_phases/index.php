@@ -12,7 +12,7 @@
         <td><?= $no++ ?></td><td><code><?= esc($phase['phase_key']) ?></code></td><td><?= esc($phase['phase_name']) ?></td><td><?= esc($phase['days_after_join']) ?></td>
         <td><?= $phase['is_active'] ? '<span class="badge bg-success">Aktif</span>' : '<span class="badge bg-secondary">Nonaktif</span>' ?></td>
         <td><div style="white-space:pre-wrap;max-width:520px;max-height:100px;overflow:auto"><?= esc($phase['message']) ?></div></td>
-        <td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-warning" onclick='editPhase(<?= json_encode($phase, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP) ?>)'><i class="bi bi-pencil"></i></button><a class="btn btn-sm btn-outline-danger" href="<?= base_url('activity-reminder-phases/delete/' . $phase['id']) ?>" onclick="return confirm('Hapus fase ini?')"><i class="bi bi-trash"></i></a></div></td>
+        <td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-warning" onclick='editPhase(<?= json_encode($phase, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP) ?>)'><i class="bi bi-pencil"></i></button><a class="btn btn-sm btn-outline-danger" href="<?= base_url('activity-reminder-phases/delete/' . $phase['id']) ?>" data-confirm="Hapus fase ini?" data-confirm-title="Hapus fase reminder" data-confirm-button="Ya, hapus"><i class="bi bi-trash"></i></a></div></td>
     </tr><?php endforeach; ?>
     </tbody></table></div>
 </div>

@@ -800,8 +800,8 @@
         }
     });
 
-    function restartBot() {
-        if (!confirm('Yakin ingin merestart bot WhatsApp?')) return;
+    async function restartBot() {
+        if (!await showAppConfirm('Yakin ingin merestart bot WhatsApp?', {title: 'Restart bot WhatsApp', confirmText: 'Restart sekarang'})) return;
         fetch('http://103.89.4.144:3000/api/restart-bot', {
                 method: 'POST',
                 headers: {
@@ -819,8 +819,8 @@
             .catch(err => alert('Gagal menghubungi server: ' + err.message));
     }
 
-    function resetSesi() {
-        if (!confirm('âš ï¸ HATI-HATI!\nIni akan MENGHAPUS sesi WhatsApp bot.\nLanjutkan?')) return;
+    async function resetSesi() {
+        if (!await showAppConfirm('HATI-HATI!\nIni akan MENGHAPUS sesi WhatsApp bot.\nLanjutkan?', {title: 'Reset sesi WhatsApp', confirmText: 'Ya, reset sesi', danger: true})) return;
         fetch('http://103.89.4.144:3000/api/reset-sesi', {
                 method: 'POST',
                 headers: {

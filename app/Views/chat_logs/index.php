@@ -91,7 +91,7 @@
         <h4 class="fw-bold mb-1"><?= $title ?></h4>
         <p class="text-muted small mb-0">Pantau percakapan bot Telegram dengan pengguna secara real-time.</p>
     </div>
-    <a href="<?= base_url('chat-logs/clear-all') ?>" class="btn btn-sm btn-danger rounded-pill fw-semibold" onclick="return confirm('Yakin ingin menghapus SELURUH riwayat obrolan dari database?')">
+    <a href="<?= base_url('chat-logs/clear-all') ?>" class="btn btn-sm btn-danger rounded-pill fw-semibold" data-confirm="Yakin ingin menghapus SELURUH riwayat obrolan dari database?" data-confirm-title="Hapus seluruh riwayat chat" data-confirm-button="Ya, hapus semua">
         <i class="bi bi-trash3 me-1"></i> Bersihkan Log
     </a>
 </div>

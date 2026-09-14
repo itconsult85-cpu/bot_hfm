@@ -63,7 +63,7 @@
                                         <a href="<?= base_url('bot-global/edit/' . $g['id']) ?>" class="btn btn-sm btn-light border text-warning rounded-circle" title="Edit">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <a href="<?= base_url('bot-global/delete/' . $g['id']) ?>" class="btn btn-sm btn-light border text-danger rounded-circle" onclick="return confirm('Yakin ingin menghapus variabel ini?')" title="Hapus">
+                                        <a href="<?= base_url('bot-global/delete/' . $g['id']) ?>" class="btn btn-sm btn-light border text-danger rounded-circle" data-confirm="Yakin ingin menghapus variabel ini?" data-confirm-title="Hapus variabel global" data-confirm-button="Ya, hapus" title="Hapus">
                                             <i class="bi bi-trash"></i>
                                         </a>
                                     </div>
