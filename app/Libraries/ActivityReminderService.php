@@ -98,6 +98,15 @@ class ActivityReminderService
         $failed = 0;
         $errors = [];
         $sentMembers = [];
+        $evaluationMembers = $due;
+        $phaseCounts = ['h3' => 0, 'h1' => 0, 'final' => 0];
+
+        foreach ($due as $member) {
+            $memberPhase = $member['reminder_phase'];
+            if (array_key_exists($memberPhase, $phaseCounts)) {
+                $phaseCounts[$memberPhase]++;
+            }
+        }
 
         foreach ($due as $member) {
             $memberPhase = $member['reminder_phase'];
@@ -130,8 +139,15 @@ class ActivityReminderService
                 $errors[] = ($member['nama'] ?: $member['id_hfm']) . ': ' . ($response['description'] ?? 'Telegram gagal');
             }
         }
-        $result = ['due' => count($due), 'sent' => $sent, 'skipped' => $skipped, 'failed' => $failed, 'errors' => $errors];
-        $this->sendAdminReport($token, $adminId, $result, $sentMembers);
+        $result = [
+            'due' => count($due),
+            'sent' => $sent,
+            'skipped' => $skipped,
+            'failed' => $failed,
+            'errors' => $errors,
+            'phase_counts' => $phaseCounts,
+        ];
+        $this->sendAdminReport($token, $adminId, $result, $evaluationMembers);
         return $result;
     }
 
@@ -323,7 +339,7 @@ class ActivityReminderService
         return trim((string) ($row['key_value'] ?? ''));
     }
 
-    private function sendAdminReport(string $token, string $adminId, array $result, array $sentMembers): void
+    private function sendAdminReport(string $token, string $adminId, array $result, array $evaluationMembers): void
     {
         if ($adminId === '' || ($result['due'] === 0 && $result['failed'] === 0)) {
             return;
@@ -336,12 +352,28 @@ class ActivityReminderService
             'Berhasil dikirim: ' . $result['sent'],
             'Sudah pernah dikirim: ' . $result['skipped'],
             'Gagal: ' . $result['failed'],
+            '',
+            '<b>REKAP FASE EVALUASI</b>',
+            'H-3: ' . ($result['phase_counts']['h3'] ?? 0) . ' client',
+            'H-1: ' . ($result['phase_counts']['h1'] ?? 0) . ' client',
+            'Final: ' . ($result['phase_counts']['final'] ?? 0) . ' client',
         ];
-        foreach ($sentMembers as $member) {
+        if ($evaluationMembers !== []) {
+            $lines[] = '';
+            $lines[] = '<b>LINK TINDAKAN ADMIN</b>';
+        }
+        foreach ($evaluationMembers as $member) {
             $name = htmlspecialchars((string) ($member['nama'] ?: '-'), ENT_QUOTES, 'UTF-8');
             $hfm = htmlspecialchars((string) $member['id_hfm'], ENT_QUOTES, 'UTF-8');
             $telegram = htmlspecialchars((string) $member['id_telegram'], ENT_QUOTES, 'UTF-8');
-            $lines[] = "✅ {$name} | HFM: {$hfm} | <a href=\"tg://user?id={$telegram}\">Telegram</a>";
+            $removeUrl = base_url('activity-reminders/remove/' . (int) $member['id']);
+            $phaseLabel = match ($member['reminder_phase']) {
+                'h3' => 'H-3',
+                'h1' => 'H-1',
+                'final' => 'FINAL',
+                default => strtoupper((string) $member['reminder_phase']),
+            };
+            $lines[] = "{$phaseLabel} | {$name} | HFM: {$hfm} | <a href=\"tg://user?id={$telegram}\">Telegram</a> | <a href=\"{$removeUrl}\">KICK &amp; HAPUS</a>";
         }
         foreach ($result['errors'] as $error) {
             $lines[] = '❌ ' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8');

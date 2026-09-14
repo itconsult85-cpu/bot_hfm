@@ -12,7 +12,7 @@ cron.schedule('0 8 * * *', async () => {
 }, { scheduled: true, timezone: 'Asia/Jakarta' });
 ```
 
-Endpoint tersebut hanya mengirim reminder client yang jatuh tempo berdasarkan status tidak aktif trading dan langsung mengirim laporan hasilnya ke admin. Jika ingin memakai cron server sebagai alternatif, gunakan konfigurasi berikut dengan timezone `Asia/Jakarta`:
+Endpoint tersebut mengirim reminder client sesuai fase yang jatuh tempo berdasarkan status tidak aktif trading. Setelah itu admin menerima report yang berisi jumlah client pada fase **H-3**, **H-1**, dan **Final**, serta link **KICK & HAPUS** untuk setiap client. Link tersebut tidak mengeksekusi apa pun sebelum admin membukanya; saat dibuka, client dikick dari Telegram lalu datanya dihapus dari database. Jika ingin memakai cron server sebagai alternatif, gunakan konfigurasi berikut dengan timezone `Asia/Jakarta`:
 
 ```cron
 5 4 * * * cd /path/ke/project && php spark hfm:sync-members >> writable/logs/hfm-sync.log 2>&1
