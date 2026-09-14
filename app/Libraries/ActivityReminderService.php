@@ -210,11 +210,19 @@ class ActivityReminderService
         $updated = 0;
         $failed = 0;
 
-        foreach (array_chunk($members, 25) as $batch) {
+        // Batch kecil mencegah API HFM atau koneksi VPS kewalahan.
+        foreach (array_chunk($members, 10) as $batch) {
             $reports = $this->fetchHfmReportsBatch($batch);
 
             foreach ($batch as $member) {
                 $report = $reports[(string) $member['id_hfm']] ?? null;
+                // Jika request paralel gagal sementara, ulangi satu per satu maksimal dua kali.
+                if (!$report) {
+                    for ($attempt = 1; $attempt <= 2 && !$report; $attempt++) {
+                        usleep(250000 * $attempt);
+                        $report = $this->fetchHfmReport((string) $member['id_hfm']);
+                    }
+                }
                 if (!$report || empty($report['id'])) {
                     $failed++;
                     continue;
@@ -253,15 +261,21 @@ class ActivityReminderService
                 CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . self::HFM_API_KEY, 'Accept: application/json'],
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_CONNECTTIMEOUT => 3,
-                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 8,
+                CURLOPT_TIMEOUT => 20,
+                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_USERAGENT => 'HFM-Bot-Sync/1.0',
             ]);
             curl_multi_add_handle($multi, $ch);
             $handles[$id] = $ch;
         }
         do {
             $status = curl_multi_exec($multi, $running);
-            if ($running) curl_multi_select($multi, 1.0);
+            if ($running) {
+                $selected = curl_multi_select($multi, 1.0);
+                if ($selected === -1) usleep(100000);
+            }
         } while ($running && $status === CURLM_OK);
         $reports = [];
         foreach ($handles as $id => $ch) {
@@ -307,7 +321,11 @@ class ActivityReminderService
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . self::HFM_API_KEY, 'Accept: application/json'],
             CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_TIMEOUT => 15,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_USERAGENT => 'HFM-Bot-Sync/1.0',
         ]);
         $raw = curl_exec($ch);
         curl_close($ch);
