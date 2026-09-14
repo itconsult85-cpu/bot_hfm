@@ -2,7 +2,17 @@
 
 Jalankan SQL [`sql/activity_reminder.sql`](../sql/activity_reminder.sql) satu kali pada database yang sedang digunakan aplikasi. Tabel tersebut menyimpan log per member dan fase agar cron yang berjalan ulang tidak mengirim pesan ganda.
 
-Tambahkan dua cron server berikut dengan timezone `Asia/Jakarta` atau set timezone PHP/server ke `Asia/Jakarta`:
+Jadwal reminder client pukul 08:00 WIB dijalankan oleh `bot.js`, bukan oleh laporan harian pukul 04:05 WIB. Blok laporan 04:05 di `bot.js` tetap terpisah dan tidak diubah.
+
+Tambahkan scheduler 08:00 berikut pada proses `bot.js` yang sedang berjalan:
+
+```js
+cron.schedule('0 8 * * *', async () => {
+  await axios.post('http://103.89.4.144/bot_wa/client/run-activity-reminders', {}, { timeout: 120000 });
+}, { scheduled: true, timezone: 'Asia/Jakarta' });
+```
+
+Endpoint tersebut hanya mengirim reminder client yang jatuh tempo berdasarkan status tidak aktif trading dan langsung mengirim laporan hasilnya ke admin. Jika ingin memakai cron server sebagai alternatif, gunakan konfigurasi berikut dengan timezone `Asia/Jakarta`:
 
 ```cron
 5 4 * * * cd /path/ke/project && php spark hfm:sync-members >> writable/logs/hfm-sync.log 2>&1

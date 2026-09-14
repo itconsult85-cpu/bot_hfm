@@ -30,6 +30,17 @@ class ActivityReminder extends BaseController
         ));
     }
 
+    // Dipanggil scheduler bot pada pukul 08:00 WIB.
+    public function runScheduled()
+    {
+        $result = $this->service->sendDue();
+
+        return $this->response->setJSON([
+            'status' => $result['failed'] > 0 ? 'partial' : 'ok',
+            'result' => $result,
+        ]);
+    }
+
     // Hanya dijalankan setelah admin menekan tombol hapus.
     public function remove($id)
     {
