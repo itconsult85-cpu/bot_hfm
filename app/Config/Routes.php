@@ -34,6 +34,9 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->post('activity-reminder-phases/store', 'ActivityReminderPhase::store');
     $routes->post('activity-reminder-phases/update/(:num)', 'ActivityReminderPhase::update/$1');
     $routes->get('activity-reminder-phases/delete/(:num)', 'ActivityReminderPhase::delete/$1');
+    $routes->get('bot-schedules', 'BotSchedule::index');
+    $routes->post('bot-schedules/update/(:num)', 'BotSchedule::update/$1');
+    $routes->post('bot-schedules/restart-bot', 'BotSchedule::restartBot');
     $routes->get('AdminDashboard/syncHfm/(:any)', 'AdminDashboard::syncHfm/$1');
     $routes->post('AdminDashboard/update-member', 'AdminDashboard::updateMember');
     $routes->post('admin/update-member', 'AdminDashboard::updateMember');
@@ -108,6 +111,7 @@ $routes->get('client/apiGetPasif', 'Client::apiGetPasif');
 $routes->get('client/apiMemberKeluarIB', 'Client::apiMemberKeluarIB');
 $routes->post('client/prosesFollowUp', 'Client::prosesFollowUp');
 $routes->post('client/run-activity-reminders', 'ActivityReminder::runScheduled');
+$routes->get('client/bot-schedules', 'BotSchedule::api');
 $routes->get('client/apiHapusMemberGrup/(:any)', 'Client::apiHapusMemberGrup/$1');
 $routes->get('client/apiLaporanHarian', 'Client::apiLaporanHarian');
 $routes->post('client/simpanMemberForm', 'Client::simpanMemberForm');

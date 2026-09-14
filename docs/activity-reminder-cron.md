@@ -2,17 +2,9 @@
 
 Jalankan SQL [`sql/activity_reminder.sql`](../sql/activity_reminder.sql) satu kali pada database yang sedang digunakan aplikasi. Tabel tersebut menyimpan log per member dan fase agar cron yang berjalan ulang tidak mengirim pesan ganda.
 
-Jadwal reminder client pukul 08:00 WIB dijalankan oleh `bot.js`, bukan oleh laporan harian pukul 04:05 WIB. Blok laporan 04:05 di `bot.js` tetap terpisah dan tidak diubah.
+Jadwal pengiriman sekarang dikelola dari menu **Pengaturan Bot → Jadwal Pengiriman & Bot** di dashboard. Nilai awal tetap laporan harian pukul **04:05 WIB** dan reminder aktivitas pukul **08:00 WIB**. Blok laporan 04:05 tetap terpisah dari evaluasi aktivitas.
 
-Tambahkan scheduler 08:00 berikut pada proses `bot.js` yang sedang berjalan:
-
-```js
-cron.schedule('0 8 * * *', async () => {
-  await axios.post('http://103.89.4.144/bot_wa/client/run-activity-reminders', {}, { timeout: 120000 });
-}, { scheduled: true, timezone: 'Asia/Jakarta' });
-```
-
-Endpoint tersebut mengirim reminder client sesuai fase yang jatuh tempo berdasarkan status tidak aktif trading. Setelah itu admin menerima report yang berisi jumlah client pada fase **H-3**, **H-1**, dan **Final**, serta link **KICK & HAPUS** untuk setiap client. Link tersebut tidak mengeksekusi apa pun sebelum admin membukanya; saat dibuka, client dikick dari Telegram lalu datanya dihapus dari database. Jika ingin memakai cron server sebagai alternatif, gunakan konfigurasi berikut dengan timezone `Asia/Jakarta`:
+Bot membaca perubahan jadwal dari database secara otomatis setiap menit. Endpoint tersebut mengirim reminder client sesuai fase yang jatuh tempo berdasarkan status tidak aktif trading. Setelah itu admin menerima report yang berisi jumlah client pada fase **H-3**, **H-1**, dan **Final**, serta link **KICK & HAPUS** untuk setiap client. Link tersebut tidak mengeksekusi apa pun sebelum admin membukanya; saat dibuka, client dikick dari Telegram lalu datanya dihapus dari database.
 
 ```cron
 5 4 * * * cd /path/ke/project && php spark hfm:sync-members >> writable/logs/hfm-sync.log 2>&1

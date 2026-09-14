@@ -9,7 +9,7 @@
     $uri = uri_string();
 
     // Logika untuk mengecek apakah submenu Bot Settings atau Bot Data sedang aktif
-    $isBotSettings = strpos($uri, 'bot-global') === 0 || strpos($uri, 'bot-flow') === 0 || strpos($uri, 'bot-faq') === 0 || strpos($uri, 'activity-reminder-phases') === 0;
+    $isBotSettings = strpos($uri, 'bot-global') === 0 || strpos($uri, 'bot-flow') === 0 || strpos($uri, 'bot-faq') === 0 || strpos($uri, 'activity-reminder-phases') === 0 || strpos($uri, 'bot-schedules') === 0;
     $isBotData = strpos($uri, 'user-progress') === 0 || strpos($uri, 'chat-logs') === 0 || strpos($uri, 'activity-reminders') === 0;
     ?>
 
@@ -47,6 +47,7 @@
                 <a href="<?= base_url('bot-flow') ?>" class="submenu-link <?= (strpos($uri, 'bot-flow') === 0) ? 'active' : '' ?>">Alur Pendaftaran (Flows)</a>
                 <a href="<?= base_url('bot-faq') ?>" class="submenu-link <?= (strpos($uri, 'bot-faq') === 0) ? 'active' : '' ?>">Tanya Jawab (FAQs)</a>
                 <a href="<?= base_url('activity-reminder-phases') ?>" class="submenu-link <?= (strpos($uri, 'activity-reminder-phases') === 0) ? 'active' : '' ?>">Fase Pengingat Aktivitas</a>
+                <a href="<?= base_url('bot-schedules') ?>" class="submenu-link <?= (strpos($uri, 'bot-schedules') === 0) ? 'active' : '' ?>">Jadwal Pengiriman &amp; Bot</a>
             </div>
         </div>
 
