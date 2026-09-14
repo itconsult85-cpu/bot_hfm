@@ -63,7 +63,7 @@ class BotSchedule extends BaseController
                 'detail' => 'Pasang deploy/hfm-bot-restart.service ke /etc/systemd/system/.',
             ]);
         }
-        $command = '/usr/bin/sudo -n /usr/bin/systemctl restart ' . $service . ' 2>&1';
+        $command = '/usr/bin/sudo -n -u bonichi /usr/bin/pm2 restart bot_tele_hfm --update-env 2>&1';
         $output = [];
         $exitCode = 1;
         exec($command, $output, $exitCode);
