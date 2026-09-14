@@ -56,6 +56,7 @@ class ActivityReminder extends BaseController
             'no_wa' => $member['no_wa'],
             'id_hfm' => $member['id_hfm'],
             'nama' => $member['nama'],
+            'id_telegram' => $member['id_telegram'] ?? null,
             'tipe_aktivitas' => 'keluar_di_remove',
         ]);
         $db->table('tb_member_vip')->where('id', (int) $id)->delete();

@@ -99,7 +99,7 @@ class AdminDashboard extends BaseController
 
         // Build query
         $builder = $db->table('tb_member_logs');
-        $builder->select('tb_member_logs.*, tb_member_vip.status as status_member, tb_member_vip.id_telegram');
+        $builder->select('tb_member_logs.*, tb_member_vip.status as status_member, COALESCE(tb_member_vip.id_telegram, tb_member_logs.id_telegram) as id_telegram');
 
         // 1. SUBQUERY: Mengunci agar hanya mengambil aktivitas paling TERAKHIR per member (Berdasarkan No WA)
         $subquery = "(SELECT no_wa, MAX(created_at) as max_date FROM tb_member_logs GROUP BY no_wa)";
@@ -745,6 +745,7 @@ class AdminDashboard extends BaseController
             'no_wa'          => $cek['no_wa'],
             'nama'           => $cek['nama'],
             'id_hfm'         => $cek['id_hfm'],
+            'id_telegram'    => $cek['id_telegram'] ?? null,
             'tipe_aktivitas' => 'keluar_di_remove'
         ]);
 
@@ -793,6 +794,7 @@ class AdminDashboard extends BaseController
             'no_wa'          => $cek['no_wa'],
             'nama'           => $cek['nama'],
             'id_hfm'         => $cek['id_hfm'],
+            'id_telegram'    => $cek['id_telegram'] ?? null,
             'tipe_aktivitas' => 'keluar_di_remove'
         ]);
 

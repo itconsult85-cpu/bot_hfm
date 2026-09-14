@@ -577,6 +577,7 @@ class Client extends BaseController
                 'no_wa'          => $member['no_wa'],
                 'nama'           => $member['nama'],
                 'id_hfm'         => $member['id_hfm'],
+                'id_telegram'    => $member['id_telegram'] ?? null,
                 'tipe_aktivitas' => $jenis_keluar
             ]);
             $db->table('tb_member_vip')->where('id', $member['id'])->update([

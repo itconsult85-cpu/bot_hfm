@@ -212,7 +212,12 @@
                                         $icon = 'bi-exclamation-triangle';
                                         break;
                                 }
-                                $label = ucfirst(str_replace('_', ' ', $tipeAktivitasBersih));
+                                $label = match ($tipeAktivitasBersih) {
+                                    'keluar_sendiri' => 'Keluar sendiri',
+                                    'keluar_di_remove', 'dihapus_admin_web' => 'Di-kick admin',
+                                    'keluar_grup' => 'Keluar grup',
+                                    default => ucfirst(str_replace('_', ' ', $tipeAktivitasBersih)),
+                                };
                                 ?>
                                 <span class="badge <?= $badgeClass ?>"><i class="bi <?= $icon ?> me-1"></i> <?= $label ?></span>
                             </td>
@@ -229,7 +234,7 @@
                                     <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">Tidak Terdaftar</span>
                                 <?php endif; ?>
                             </td>
-                            <td><span class="text-muted small" title="<?= esc($log['created_at']) ?>"><i class="bi bi-clock me-1"></i><?= date('d M Y H:i', strtotime($log['created_at'])) ?></span></td>
+                            <td><span class="text-muted small" title="<?= esc($log['created_at']) ?>"><i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($log['created_at'])) ?><br><i class="bi bi-clock me-1"></i><?= date('H:i:s', strtotime($log['created_at'])) ?> WIB</span></td>
                             <td>
                                 <div class="d-flex gap-1 justify-content-center">
                                     <button class="btn btn-sm btn-light border rounded-circle" onclick="editIdLog('<?= esc($log['id_hfm'] ?? '') ?>')" title="Edit ID Trading"><i class="bi bi-pencil-square text-warning"></i></button>
