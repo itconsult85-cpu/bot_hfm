@@ -30,7 +30,11 @@
 </div>
 <script>
 async function restartTelegramBot() {
-    if (!confirm('Restart proses PM2 bot_tele_hfm sekarang?')) return;
+    const approved = await showAppConfirm('Restart proses PM2 bot_tele_hfm sekarang?', {
+        title: 'Restart bot Telegram',
+        confirmText: 'Restart sekarang'
+    });
+    if (!approved) return;
     try {
         const response = await fetch('<?= base_url('bot-schedules/restart-bot') ?>', {
             method: 'POST',
@@ -48,8 +52,8 @@ async function restartTelegramBot() {
             const detail = data.detail ? `\nDetail: ${data.detail}` : '';
             throw new Error((data.error || `HTTP ${response.status}`) + detail);
         }
-        alert(data.message || 'bot_tele_hfm berhasil direstart.');
-    } catch (error) { alert('Restart gagal: ' + error.message); }
+        await showAppAlert(data.message || 'bot_tele_hfm berhasil direstart.');
+    } catch (error) { await showAppAlert('Restart gagal: ' + error.message); }
 }
 </script>
 <?= $this->endSection() ?>

@@ -69,7 +69,7 @@
                                         <a href="<?= base_url('bot-faq/edit/' . $faq['id']) ?>" class="btn btn-sm btn-light border text-warning rounded-circle" title="Edit">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <a href="<?= base_url('bot-faq/delete/' . $faq['id']) ?>" class="btn btn-sm btn-light border text-danger rounded-circle" title="Hapus" onclick="return confirm('Yakin ingin menghapus data FAQ ini?')">
+                                        <a href="<?= base_url('bot-faq/delete/' . $faq['id']) ?>" class="btn btn-sm btn-light border text-danger rounded-circle" title="Hapus" data-confirm="Yakin ingin menghapus data FAQ ini?" data-confirm-title="Hapus FAQ" data-confirm-button="Ya, hapus">
                                             <i class="bi bi-trash"></i>
                                         </a>
                                     </div>

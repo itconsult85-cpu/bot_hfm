@@ -28,7 +28,7 @@
                     <td><?= esc(date('d M Y', strtotime($member['created_at']))) ?></td>
                     <td><?= esc($member['last_trade_display']) ?></td>
                     <td><span class="badge <?= $member['reminder_phase'] === 'final' ? 'bg-danger' : ($member['reminder_phase'] === 'h1' ? 'bg-warning text-dark' : 'bg-info text-dark') ?>"><?= esc(strtoupper($member['reminder_phase'])) ?></span></td>
-                    <td><a class="btn btn-sm btn-outline-danger rounded-pill" href="<?= base_url('activity-reminders/remove/' . (int) $member['id']) ?>" onclick="return confirm('Kick client dari Telegram dan hapus data database?')"><i class="bi bi-person-x"></i> Kick & Hapus</a></td>
+                    <td><a class="btn btn-sm btn-outline-danger rounded-pill" href="<?= base_url('activity-reminders/remove/' . (int) $member['id']) ?>" data-confirm="Kick client dari Telegram dan hapus data database?" data-confirm-title="Kick dan hapus client" data-confirm-button="Ya, kick & hapus"><i class="bi bi-person-x"></i> Kick & Hapus</a></td>
                 </tr>
             <?php endforeach; endif; ?>
             </tbody>

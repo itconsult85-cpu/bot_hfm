@@ -102,7 +102,7 @@
                                     <i class="bi bi-clock me-1"></i> <?= date('d M Y, H:i', strtotime($p['last_active'])) ?>
                                 </td>
                                 <td class="text-center">
-                                    <a href="<?= base_url('user-progress/delete/' . $p['user_id']) ?>" class="btn btn-sm btn-light border text-danger rounded-pill px-3 fw-semibold shadow-sm" onclick="return confirm('Yakin ingin mereset riwayat user ini kembali ke Step 1?')">
+                                    <a href="<?= base_url('user-progress/delete/' . $p['user_id']) ?>" class="btn btn-sm btn-light border text-danger rounded-pill px-3 fw-semibold shadow-sm" data-confirm="Yakin ingin mereset riwayat user ini kembali ke Step 1?" data-confirm-title="Reset riwayat user" data-confirm-button="Ya, reset">
                                         <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
                                     </a>
                                 </td>

@@ -240,7 +240,7 @@
                                     <button class="btn btn-sm btn-light border rounded-circle" onclick="editIdLog('<?= esc($log['id_hfm'] ?? '') ?>')" title="Edit ID Trading"><i class="bi bi-pencil-square text-warning"></i></button>
 
                                     <button class="btn btn-sm btn-light border rounded-circle" onclick="showDetail('<?= esc($log['no_wa']) ?>', '<?= esc($log['id_telegram'] ?? '-') ?>', '<?= esc($log['nama']) ?>', '<?= esc($log['tipe_aktivitas']) ?>', '<?= esc($log['created_at']) ?>', '<?= esc($log['id_hfm'] ?? '-') ?>')"><i class="bi bi-eye text-primary"></i></button>
-                                    <a href="<?= base_url('AdminDashboard/hapusLog/' . esc($log['id'] ?? '')) ?>" class="btn btn-sm btn-light border rounded-circle" onclick="return confirm('Yakin ingin menghapus riwayat log ini?');"><i class="bi bi-trash text-danger"></i></a>
+                                    <a href="<?= base_url('AdminDashboard/hapusLog/' . esc($log['id'] ?? '')) ?>" class="btn btn-sm btn-light border rounded-circle" data-confirm="Yakin ingin menghapus riwayat log ini?" data-confirm-title="Hapus riwayat log" data-confirm-button="Ya, hapus"><i class="bi bi-trash text-danger"></i></a>
                                 </div>
                             </td>
                         </tr>
