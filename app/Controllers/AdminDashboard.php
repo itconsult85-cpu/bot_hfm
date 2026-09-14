@@ -378,26 +378,43 @@ class AdminDashboard extends BaseController
             ]);
         }
 
-        $url = $this->baseUrl . "/clients/" . $member['id_hfm'] . "/report";
+        $url = $this->baseUrl . "/clients/" . rawurlencode($member['id_hfm']) . "/report";
+        $response = false;
+        $httpCode = 0;
+        $curlError = '';
+        $curlErrno = 0;
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $this->apiKey,
-            'Accept: application/json',
-        ]);
-        // Matikan verifikasi SSL agar request tidak diblokir/timeout
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
+        // HFM kadang lambat merespons. Pisahkan batas koneksi dari batas response,
+        // paksa IPv4 (menghindari route IPv6 VPS yang menggantung), dan ulangi
+        // sekali hanya untuk kegagalan jaringan sementara.
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' . $this->apiKey,
+                    'Accept: application/json',
+                ],
+                CURLOPT_ENCODING => '',
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_CONNECTTIMEOUT => 8,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_USERAGENT => 'BOSSCUAN-HFM-Sync/1.0',
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            $curlErrno = curl_errno($ch);
+            curl_close($ch);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        $curlErrno = curl_errno($ch);
-        curl_close($ch);
+            if ($response !== false || $curlErrno === 0 || $attempt === 2) {
+                break;
+            }
+            usleep(250000);
+        }
 
         if ($response && $httpCode === 200) {
             $rawData = json_decode($response, true);
