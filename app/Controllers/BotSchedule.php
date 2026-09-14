@@ -51,12 +51,17 @@ class BotSchedule extends BaseController
     {
         // Jangan bergantung pada port 3000: jika bot mati, endpoint Node juga mati.
         // Dashboard menjalankan PM2 langsung pada proses yang sudah ditentukan.
+        if (!function_exists('exec')) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'error' => 'Fungsi exec() PHP dinonaktifkan di server. Hapus exec dari disable_functions lalu restart Apache.',
+            ]);
+        }
         $pm2 = is_executable('/usr/bin/pm2') ? '/usr/bin/pm2' : trim((string) shell_exec('command -v pm2'));
         if ($pm2 === '') {
             return $this->response->setStatusCode(500)->setJSON(['error' => 'PM2 tidak ditemukan di server.']);
         }
         $command = sprintf(
-            'sudo -n -u bonichi %s restart bot_tele_hfm --update-env 2>&1',
+            '/usr/bin/sudo -n -u bonichi %s restart bot_tele_hfm --update-env 2>&1',
             escapeshellarg($pm2)
         );
         $output = [];
@@ -67,7 +72,7 @@ class BotSchedule extends BaseController
             log_message('error', 'Gagal restart bot_tele_hfm: ' . implode("\n", $output));
             return $this->response->setStatusCode(500)->setJSON([
                 'error' => 'Gagal restart bot_tele_hfm. Pastikan user PHP memiliki akses menjalankan PM2 milik bonichi.',
-                'detail' => implode(' ', $output),
+                'detail' => implode(' ', $output) ?: 'Tidak ada output dari perintah restart.',
             ]);
         }
 
