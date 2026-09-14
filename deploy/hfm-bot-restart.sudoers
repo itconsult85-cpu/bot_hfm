@@ -1,2 +1,3 @@
 # Pasang sebagai /etc/sudoers.d/hfm-bot-restart dengan owner root:root dan mode 0440.
-www-data ALL=(bonichi) NOPASSWD: /usr/local/sbin/hfm-restart-bot
+# Hanya wrapper ini yang boleh dijalankan www-data sebagai bonichi.
+www-data ALL=(bonichi) NOPASSWD: /usr/local/sbin/hfm-restart-bot, /usr/local/sbin/hfm-restart-bot *

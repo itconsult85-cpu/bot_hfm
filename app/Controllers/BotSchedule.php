@@ -63,7 +63,9 @@ class BotSchedule extends BaseController
                 'detail' => 'Pasang deploy/hfm-restart-bot di VPS. Jangan memasang wrapper produksi pada localhost.',
             ]);
         }
-        $command = '/usr/bin/sudo -n -u bonichi ' . escapeshellarg($restartScript) . ' 2>&1';
+        // Gunakan command literal yang sama dengan aturan sudoers; wrapper hanya
+        // boleh merestart bot_tele_hfm dan tidak menerima argumen tambahan.
+        $command = '/usr/bin/sudo -n -u bonichi ' . $restartScript . ' 2>&1';
         $output = [];
         $exitCode = 1;
         exec($command, $output, $exitCode);
