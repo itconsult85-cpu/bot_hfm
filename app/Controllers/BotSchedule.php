@@ -51,11 +51,12 @@ class BotSchedule extends BaseController
     {
         // Jangan bergantung pada port 3000: jika bot mati, endpoint Node juga mati.
         // Dashboard menjalankan PM2 langsung pada proses yang sudah ditentukan.
-        $pm2 = is_executable('/usr/bin/pm2') ? '/usr/bin/pm2' : 'pm2';
+        $pm2 = is_executable('/usr/bin/pm2') ? '/usr/bin/pm2' : trim((string) shell_exec('command -v pm2'));
+        if ($pm2 === '') {
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'PM2 tidak ditemukan di server.']);
+        }
         $command = sprintf(
-            'cd %s && PM2_HOME=%s %s restart bot_tele_hfm --update-env 2>&1',
-            escapeshellarg('/home/bonichi/bot_hfm'),
-            escapeshellarg('/home/bonichi/.pm2'),
+            'sudo -n -u bonichi %s restart bot_tele_hfm --update-env 2>&1',
             escapeshellarg($pm2)
         );
         $output = [];
