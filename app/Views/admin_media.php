@@ -1,38 +1,5 @@
 <?= $this->extend('layout/template') ?>
 
-<?= $this->section('styles') ?>
-<style>
-    .data-card {
-        border: 1px solid #e2e8f0;
-        background: #ffffff;
-        border-radius: 16px;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .data-card:hover {
-        transform: translateX(4px);
-        box-shadow: 0 12px 20px rgba(0, 0, 0, 0.03);
-        border-color: #cbd5e1;
-    }
-
-    .media-preview {
-        width: 70px;
-        height: 70px;
-        object-fit: cover;
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        transition: transform 0.2s;
-    }
-
-    .media-preview:hover {
-        transform: scale(2.5);
-        z-index: 10;
-        position: relative;
-        box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
-    }
-</style>
-<?= $this->endSection() ?>
-
 <?= $this->section('content') ?>
 <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
     <div>

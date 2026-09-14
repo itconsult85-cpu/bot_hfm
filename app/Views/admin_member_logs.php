@@ -1,38 +1,5 @@
 <?= $this->extend('layout/template') ?>
 
-<?= $this->section('styles') ?>
-<style>
-    .stat-card {
-        border: 1px solid #e2e8f0;
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 1.5rem;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 20px rgba(0, 0, 0, 0.03);
-    }
-
-    .stat-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-    }
-
-    .form-control,
-    .form-select {
-        border-radius: 10px;
-        padding: 0.6rem 1rem;
-    }
-</style>
-<?= $this->endSection() ?>
-
 <?= $this->section('content') ?>
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 mt-2 gap-3">
     <div>

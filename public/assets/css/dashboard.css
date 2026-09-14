@@ -1,0 +1,74 @@
+/* Shared dashboard theme and component styles. */
+.metric-card,
+.data-card {
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.metric-card { border-radius: 20px; }
+.metric-card:hover { transform: translateY(-4px); box-shadow: 0 15px 25px rgba(0, 0, 0, 0.04); }
+.data-card { border-radius: 16px; }
+.data-card:hover { transform: translateX(4px); box-shadow: 0 12px 20px rgba(0, 0, 0, 0.03); border-color: #cbd5e1; }
+.metric-icon,
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.stat-card {
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 20px rgba(0, 0, 0, 0.03); }
+.avatar-sub {
+    width: 46px;
+    height: 46px;
+    background: #f1f5f9;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #475569;
+}
+.modal-content { border-radius: 20px; border: none; }
+.form-control,
+.form-select { border-radius: 10px; padding: 0.6rem 1rem; }
+.media-preview {
+    width: 70px;
+    height: 70px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    transition: transform 0.2s;
+}
+.media-preview:hover { transform: scale(2.5); z-index: 10; position: relative; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2); }
+.border-dashed { border: 2px dashed #cbd5e1; }
+.chat-container { border: 1px solid #e2e8f0; border-radius: 16px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; height: 75vh; }
+.user-list { width: 320px; border-right: 1px solid #e2e8f0; overflow-y: auto; background: #f8fafc; }
+.user-item { cursor: pointer; transition: background-color 0.2s; border-bottom: 1px solid #e2e8f0; }
+.user-item:hover, .user-item.active { background-color: #e2e8f0; }
+.chat-area { flex-grow: 1; display: flex; flex-direction: column; background-color: #efeae2; background-image: url('https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-background-cool-dark-green-new-theme-whatsapp.jpg'); background-blend-mode: overlay; background-size: cover; }
+.chat-header { background: #ffffff; padding: 1rem; border-bottom: 1px solid #e2e8f0; z-index: 10; }
+.chat-history { flex-grow: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.bubble { max-width: 75%; padding: 10px 15px; font-size: 0.9rem; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); position: relative; word-wrap: break-word; white-space: pre-wrap; }
+.bubble-user { background-color: #ffffff; align-self: flex-start; border-radius: 0 15px 15px 15px; }
+.bubble-bot { background-color: #d1e7dd; align-self: flex-end; border-radius: 15px 0 15px 15px; }
+.bubble-admin { background-color: #cfe2ff; align-self: flex-end; border-radius: 15px 0 15px 15px; }
+@media (max-width: 768px) { .user-list { width: 120px; } .bubble { max-width: 90%; } }
+/* Standalone legacy pages retain the same theme. */
+.login-box { width: 360px; }
+.vip-console .data-card { border: 1px solid #e2e8f0; border-radius: 16px; background: #ffffff; }
+body.vip-console { background: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #0f172a; }
+.navbar-brand { font-weight: 800; letter-spacing: -0.02em; }
+.vip-console .data-card { transition: all 0.3s ease; }
+.vip-console .data-card:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.05); border-color: #cbd5e1; }
+.vip-console .avatar-sub { width: 48px; height: 48px; background: #eff6ff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #2563eb; font-size: 1.2rem; }
+.login-page { background-color: #f4f6f9; display: flex; align-items: center; justify-content: center; height: 100vh; }

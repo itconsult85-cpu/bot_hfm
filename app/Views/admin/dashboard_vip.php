@@ -8,58 +8,10 @@
     <!-- Bootstrap 5.3 & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <style>
-        body {
-            background: #f8fafc;
-            font-family: 'Inter', system-ui, sans-serif;
-            color: #0f172a;
-        }
-
-        .navbar-brand {
-            font-weight: 800;
-            letter-spacing: -0.02em;
-        }
-
-        .data-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            background: #ffffff;
-            transition: all 0.3s ease;
-        }
-
-        .data-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.05);
-            border-color: #cbd5e1;
-        }
-
-        .avatar-sub {
-            width: 48px;
-            height: 48px;
-            background: #eff6ff;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #2563eb;
-            font-size: 1.2rem;
-        }
-
-        .modal-content {
-            border-radius: 20px;
-            border: none;
-        }
-
-        .form-control,
-        .form-select {
-            border-radius: 10px;
-            padding: 0.6rem 1rem;
-        }
-    </style>
+    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard.css') ?>">
 </head>
 
-<body>
+<body class="vip-console">
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-white bg-white border-bottom sticky-top py-3 shadow-sm">
         <div class="container">

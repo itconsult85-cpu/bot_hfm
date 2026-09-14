@@ -6,12 +6,9 @@
     <title>Login Admin - HFM Bot</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0-rc.7/dist/css/adminlte.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f4f6f9; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .login-box { width: 360px; }
-    </style>
+    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard.css') ?>">
 </head>
-<body>
+<body class="login-page">
 <div class="login-box">
     <div class="card card-outline card-primary">
         <div class="card-header text-center">

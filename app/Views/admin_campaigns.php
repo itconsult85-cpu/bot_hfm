@@ -1,26 +1,5 @@
 <?= $this->extend('layout/template') ?>
 
-<?= $this->section('styles') ?>
-<style>
-    .data-card {
-        border: 1px solid #e2e8f0;
-        background: #ffffff;
-        border-radius: 16px;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .data-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 20px rgba(0, 0, 0, 0.03);
-        border-color: #cbd5e1;
-    }
-
-    .border-dashed {
-        border: 2px dashed #cbd5e1;
-    }
-</style>
-<?= $this->endSection() ?>
-
 <?= $this->section('content') ?>
 <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
     <div>
