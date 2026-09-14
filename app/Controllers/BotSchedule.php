@@ -49,28 +49,28 @@ class BotSchedule extends BaseController
 
     public function restartBot()
     {
-        $db = Database::connect();
-        $row = $db->table('bot_globals')->where('key_name', 'BOT_CONTROL_TOKEN')->get()->getRowArray();
-        $token = trim((string) ($row['key_value'] ?? ''));
-        if ($token === '') {
-            return $this->response->setStatusCode(503)->setJSON(['error' => 'BOT_CONTROL_TOKEN belum diatur di bot_globals.']);
+        // Jangan bergantung pada port 3000: jika bot mati, endpoint Node juga mati.
+        // Dashboard menjalankan PM2 langsung pada proses yang sudah ditentukan.
+        $pm2 = is_executable('/usr/bin/pm2') ? '/usr/bin/pm2' : 'pm2';
+        $command = sprintf(
+            'cd %s && PM2_HOME=%s %s restart bot_tele_hfm --update-env 2>&1',
+            escapeshellarg('/home/bonichi/bot_hfm'),
+            escapeshellarg('/home/bonichi/.pm2'),
+            escapeshellarg($pm2)
+        );
+        $output = [];
+        $exitCode = 1;
+        exec($command, $output, $exitCode);
+
+        if ($exitCode !== 0) {
+            log_message('error', 'Gagal restart bot_tele_hfm: ' . implode("\n", $output));
+            return $this->response->setStatusCode(500)->setJSON([
+                'error' => 'Gagal restart bot_tele_hfm. Pastikan user PHP memiliki akses menjalankan PM2 milik bonichi.',
+                'detail' => implode(' ', $output),
+            ]);
         }
 
-        $ch = curl_init('http://127.0.0.1:3000/api/restart-bot');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_POSTFIELDS => json_encode(['token' => $token]),
-            CURLOPT_TIMEOUT => 10,
-        ]);
-        $raw = curl_exec($ch);
-        $error = curl_error($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        if ($raw === false) return $this->response->setStatusCode(502)->setJSON(['error' => 'Bot tidak merespons: ' . $error]);
-        $decoded = json_decode($raw, true) ?: ['message' => $raw];
-        return $this->response->setStatusCode($status >= 200 && $status < 300 ? 200 : 502)->setJSON($decoded);
+        return $this->response->setJSON(['message' => 'bot_tele_hfm berhasil direstart.', 'output' => implode(' ', $output)]);
     }
 
     private function ensureTable(): void
