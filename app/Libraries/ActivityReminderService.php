@@ -235,7 +235,8 @@ class ActivityReminderService
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . self::HFM_API_KEY, 'Accept: application/json'],
-                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
                 CURLOPT_CONNECTTIMEOUT => 3,
                 CURLOPT_TIMEOUT => 10,
             ]);

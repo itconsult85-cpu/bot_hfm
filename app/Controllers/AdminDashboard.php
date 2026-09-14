@@ -388,11 +388,15 @@ class AdminDashboard extends BaseController
         ]);
         // Matikan verifikasi SSL agar request tidak diblokir/timeout
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        $curlErrno = curl_errno($ch);
         curl_close($ch);
 
         if ($response && $httpCode === 200) {
@@ -416,7 +420,7 @@ class AdminDashboard extends BaseController
                 $deposit_real = max($depo, $bal, $equity);
 
                 // Bersihkan string Last Trade dari milidetik
-                $last_trade_real = '0000-00-00 00:00:00';
+                    $last_trade_real = null;
                 $raw_last_trade = $dataApi['last_trade'] ?? 'N/A';
                 if (!empty($raw_last_trade) && $raw_last_trade !== 'N/A' && preg_match('/^20\d{2}/', $raw_last_trade)) {
                     $last_trade_real = date('Y-m-d H:i:s', strtotime(substr($raw_last_trade, 0, 19)));
@@ -463,9 +467,12 @@ class AdminDashboard extends BaseController
             }
         }
 
+        $detail = $curlError !== ''
+            ? "cURL #{$curlErrno}: {$curlError}"
+            : 'Respons kosong atau HTTP bukan 200 dari API HFM';
         return $this->response->setJSON([
             'status' => 'error',
-            'pesan' => 'Gagal koneksi ke HFM (HTTP: ' . $httpCode . ')'
+            'pesan' => 'Gagal koneksi ke HFM (HTTP: ' . $httpCode . '). ' . $detail
         ]);
     }
 
