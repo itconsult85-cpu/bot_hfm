@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+export HOME=/home/bonichi
+export PM2_HOME=/home/bonichi/.pm2
+exec /usr/bin/pm2 restart bot_tele_hfm --update-env
