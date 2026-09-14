@@ -32,10 +32,24 @@
 async function restartTelegramBot() {
     if (!confirm('Restart proses PM2 bot_tele_hfm sekarang?')) return;
     try {
-        const response = await fetch('<?= base_url('bot-schedules/restart-bot') ?>', {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}});
-        const data = await response.json();
-        alert(data.message || data.error || 'Selesai');
-    } catch (error) { alert('Gagal menghubungi server: ' + error.message); }
+        const response = await fetch('<?= base_url('bot-schedules/restart-bot') ?>', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                '<?= csrf_header() ?>': '<?= csrf_hash() ?>',
+                'Accept': 'application/json'
+            }
+        });
+        const raw = await response.text();
+        let data;
+        try { data = JSON.parse(raw); } catch (_) { data = { error: raw.substring(0, 500) }; }
+        if (!response.ok) {
+            const detail = data.detail ? `\nDetail: ${data.detail}` : '';
+            throw new Error((data.error || `HTTP ${response.status}`) + detail);
+        }
+        alert(data.message || 'bot_tele_hfm berhasil direstart.');
+    } catch (error) { alert('Restart gagal: ' + error.message); }
 }
 </script>
 <?= $this->endSection() ?>
