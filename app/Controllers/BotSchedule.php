@@ -67,17 +67,19 @@ class BotSchedule extends BaseController
         $output = [];
         $exitCode = 1;
         exec($command, $output, $exitCode);
+        $detail = sprintf(
+            'exit_code=%d; euid=%s; output=%s',
+            $exitCode,
+            (string) (function_exists('posix_geteuid') ? posix_geteuid() : 'unknown'),
+            implode(' | ', $output) ?: 'kosong'
+        );
+        @file_put_contents('/tmp/hfm-bot-restart.log', date('c') . ' ' . $detail . PHP_EOL, FILE_APPEND);
 
         if ($exitCode !== 0) {
-            $detail = sprintf(
-                'exit_code=%d; user=%s; output=%s',
-                $exitCode,
-                (string) (function_exists('posix_geteuid') ? posix_geteuid() : 'unknown'),
-                implode(' | ', $output) ?: 'kosong'
-            );
             log_message('error', 'Gagal restart bot_tele_hfm: ' . $detail);
+            $error = 'Gagal restart bot_tele_hfm. ' . $detail;
             return $this->response->setStatusCode(500)->setJSON([
-                'error' => 'Gagal restart bot_tele_hfm. Pastikan user PHP memiliki akses menjalankan PM2 milik bonichi.',
+                'error' => $error,
                 'detail' => $detail,
             ]);
         }
