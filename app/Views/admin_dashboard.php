@@ -155,7 +155,7 @@
 </div>
 
 <div class="row g-3" id="memberContainer">
-    <?php foreach ($members as $m): ?>
+    <?php foreach ($members as $index => $m): ?>
         <div class="col-12 member-item"
             data-nama="<?= strtolower(esc($m['nama'] ?? '')) ?>"
             data-idhfm="<?= esc($m['id_hfm']) ?>"
@@ -165,6 +165,7 @@
             data-currency="<?= esc($m['currency'] ?? 'USD') ?>">
             <div class="card data-card p-3">
                 <div class="row align-items-center g-3">
+                    <div class="col-auto text-muted fw-semibold" style="min-width: 32px;">#<?= $index + 1 ?></div>
                     <div class="col-auto">
                         <?php
                         $nama_member = trim($m['nama'] ?? '');
