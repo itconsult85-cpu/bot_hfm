@@ -49,42 +49,37 @@ class BotSchedule extends BaseController
 
     public function restartBot()
     {
-        // Jangan bergantung pada port 3000: jika bot mati, endpoint Node juga mati.
-        // Dashboard menjalankan PM2 langsung pada proses yang sudah ditentukan.
-        if (!function_exists('exec')) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'error' => 'Fungsi exec() PHP dinonaktifkan di server. Hapus exec dari disable_functions lalu restart Apache.',
-            ]);
-        }
-        $service = 'hfm-bot-restart.service';
-        if (!is_file('/etc/systemd/system/' . $service)) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'error' => 'Service restart bot belum terpasang di VPS.',
-                'detail' => 'Pasang deploy/hfm-bot-restart.service ke /etc/systemd/system/.',
-            ]);
-        }
-        $command = '/usr/bin/sudo -n -u bonichi /usr/bin/pm2 restart bot_tele_hfm --update-env 2>&1';
-        $output = [];
-        $exitCode = 1;
-        exec($command, $output, $exitCode);
-        $detail = sprintf(
-            'exit_code=%d; euid=%s; output=%s',
-            $exitCode,
-            (string) (function_exists('posix_geteuid') ? posix_geteuid() : 'unknown'),
-            implode(' | ', $output) ?: 'kosong'
-        );
-        @file_put_contents('/tmp/hfm-bot-restart.log', date('c') . ' ' . $detail . PHP_EOL, FILE_APPEND);
+        // Menggunakan API internal Node.js di port 3000 untuk restart
+        // Ini menghindari masalah permission sudo/www-data pada server Linux
+        $db = Database::connect();
+        $tokenRow = $db->table('bot_globals')->where('key_name', 'BOT_CONTROL_TOKEN')->get()->getRowArray();
+        $token = $tokenRow ? trim((string) $tokenRow['key_value']) : '';
 
-        if ($exitCode !== 0) {
-            log_message('error', 'Gagal restart bot_tele_hfm: ' . $detail);
-            $error = 'Gagal restart bot_tele_hfm. ' . $detail;
-            return $this->response->setStatusCode(500)->setJSON([
-                'error' => $error,
-                'detail' => $detail,
+        $ch = curl_init('http://127.0.0.1:3000/api/restart-bot');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS     => json_encode(['token' => $token]),
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error    = curl_error($ch);
+        curl_close($ch);
+
+        if ($httpCode === 200) {
+            return $this->response->setJSON([
+                'message' => 'bot_tele_hfm berhasil direstart via API internal.'
             ]);
         }
 
-        return $this->response->setJSON(['message' => 'bot_tele_hfm berhasil direstart.', 'output' => implode(' ', $output)]);
+        log_message('error', 'Gagal restart bot via API: ' . $response . ' | HTTP: ' . $httpCode);
+        return $this->response->setStatusCode(500)->setJSON([
+            'error'  => 'Gagal menghubungi server bot untuk restart.',
+            'detail' => $error ?: 'HTTP Code: ' . $httpCode . ' | Response: ' . $response
+        ]);
     }
 
     public function sendReport()
