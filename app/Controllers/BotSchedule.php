@@ -59,7 +59,8 @@ class BotSchedule extends BaseController
         $restartScript = '/usr/local/sbin/hfm-restart-bot';
         if (!is_file($restartScript) || !is_executable($restartScript)) {
             return $this->response->setStatusCode(500)->setJSON([
-                'error' => 'Wrapper restart belum terpasang di /usr/local/sbin/hfm-restart-bot.',
+                'error' => 'Fitur restart bot hanya tersedia di VPS. Wrapper belum terpasang di /usr/local/sbin/hfm-restart-bot pada server ini.',
+                'detail' => 'Pasang deploy/hfm-restart-bot di VPS. Jangan memasang wrapper produksi pada localhost.',
             ]);
         }
         $command = '/usr/bin/sudo -n -u bonichi ' . escapeshellarg($restartScript) . ' 2>&1';
@@ -68,10 +69,16 @@ class BotSchedule extends BaseController
         exec($command, $output, $exitCode);
 
         if ($exitCode !== 0) {
-            log_message('error', 'Gagal restart bot_tele_hfm: ' . implode("\n", $output));
+            $detail = sprintf(
+                'exit_code=%d; user=%s; output=%s',
+                $exitCode,
+                (string) (function_exists('posix_geteuid') ? posix_geteuid() : 'unknown'),
+                implode(' | ', $output) ?: 'kosong'
+            );
+            log_message('error', 'Gagal restart bot_tele_hfm: ' . $detail);
             return $this->response->setStatusCode(500)->setJSON([
                 'error' => 'Gagal restart bot_tele_hfm. Pastikan user PHP memiliki akses menjalankan PM2 milik bonichi.',
-                'detail' => implode(' ', $output) ?: 'Tidak ada output dari perintah restart.',
+                'detail' => $detail,
             ]);
         }
 
