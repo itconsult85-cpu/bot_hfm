@@ -107,17 +107,17 @@
 
 <div class="table-container shadow-sm bg-white rounded-4 border border-light overflow-hidden mb-4">
     <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
+        <table class="table table-hover mb-0 align-middle table-sm d-md-table">
             <thead class="table-light">
                 <tr>
-                    <th style="width: 50px;" class="text-center border-bottom-0">#</th>
-                    <th style="width: 20%;" class="border-bottom-0">Nama</th>
-                    <th style="width: 15%;" class="border-bottom-0">Kontak (WA & Tele)</th>
-                    <th style="width: 15%;" class="border-bottom-0">ID Trading</th>
-                    <th style="width: 15%;" class="border-bottom-0">Tipe Aktivitas</th>
-                    <th style="width: 15%;" class="border-bottom-0">Status</th>
-                    <th style="width: 15%;" class="border-bottom-0">Waktu</th>
-                    <th style="width: 80px;" class="text-center border-bottom-0">Aksi</th>
+                    <th style="width: 40px;" class="text-center border-bottom-0 px-1 px-md-3">#</th>
+                    <th class="border-bottom-0">Nama</th>
+                    <th class="border-bottom-0 d-none d-md-table-cell">Kontak (WA & Tele)</th>
+                    <th class="border-bottom-0 d-none d-md-table-cell">ID Trading</th>
+                    <th class="border-bottom-0 text-nowrap">Tipe Aktivitas</th>
+                    <th class="border-bottom-0 d-none d-md-table-cell">Status</th>
+                    <th class="border-bottom-0 d-none d-md-table-cell">Waktu</th>
+                    <th style="width: 100px;" class="text-center border-bottom-0 px-1 px-md-3">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -134,23 +134,33 @@
                 <?php else: ?>
                     <?php $no = ($currentPage - 1) * $perPage + 1; ?>
                     <?php foreach ($logs as $log): ?>
-                        <tr>
-                            <td class="text-muted small fw-semibold text-center"><?= $no++ ?></td>
-                            <td><span class="fw-semibold text-dark"><?= esc($log['nama']) ?></span></td>
 
-                            <td>
+                        <tr>
+                            <td class="text-center px-1 px-md-3">
+                                <button class="btn btn-sm btn-light border rounded-circle d-md-none shadow-sm fw-bold p-1" style="line-height: 1;" type="button" data-bs-toggle="collapse" data-bs-target="#expandLog<?= $log['id'] ?>" aria-expanded="false">
+                                    <i class="bi bi-chevron-down text-primary" style="font-size: 0.8rem;"></i>
+                                </button>
+                                <span class="text-muted small fw-semibold d-none d-md-inline"><?= $no++ ?></span>
+                            </td>
+
+                            <td class="py-2">
+                                <span class="fw-semibold text-dark d-block" style="word-break: break-word; font-size: 0.9rem;"><?= esc($log['nama']) ?></span>
+                            </td>
+
+                            <td class="text-nowrap d-none d-md-table-cell">
                                 <div class="text-muted small"><i class="bi bi-whatsapp text-success me-1"></i><?= esc($log['no_wa']) ?></div>
                                 <div class="text-muted small mt-1"><i class="bi bi-telegram text-info me-1"></i><?= esc($log['id_telegram'] ?? '-') ?></div>
                             </td>
 
-                            <td>
+                            <td class="text-nowrap d-none d-md-table-cell">
                                 <?php if (!empty($log['id_hfm'])): ?>
                                     <span class="badge bg-light text-primary border border-primary-subtle px-2 py-1"><?= esc($log['id_hfm']) ?></span>
                                 <?php else: ?>
                                     <span class="text-muted small fst-italic">-</span>
                                 <?php endif; ?>
                             </td>
-                            <td>
+
+                            <td class="text-nowrap">
                                 <?php
                                 $tipeAktivitasBersih = trim($log['tipe_aktivitas']);
                                 $badgeClass = 'bg-secondary';
@@ -188,7 +198,8 @@
                                 ?>
                                 <span class="badge <?= $badgeClass ?>"><i class="bi <?= $icon ?> me-1"></i> <?= $label ?></span>
                             </td>
-                            <td>
+
+                            <td class="text-nowrap d-none d-md-table-cell">
                                 <?php
                                 $statusMember = $log['status_member'] ?? '';
                                 if ($statusMember == 'aktif'): ?>
@@ -201,16 +212,63 @@
                                     <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">Tidak Terdaftar</span>
                                 <?php endif; ?>
                             </td>
-                            <td><span class="text-muted small" title="<?= esc($log['created_at']) ?>"><i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($log['created_at'])) ?><br><i class="bi bi-clock me-1"></i><?= date('H:i:s', strtotime($log['created_at'])) ?> WIB</span></td>
-                            <td>
-                                <div class="d-flex gap-1 justify-content-center">
-                                    <button class="btn btn-sm btn-light border rounded-circle" onclick="editIdLog('<?= esc($log['id_hfm'] ?? '') ?>')" title="Edit ID Trading"><i class="bi bi-pencil-square text-warning"></i></button>
+                            <td class="text-nowrap d-none d-md-table-cell">
+                                <span class="text-muted small" title="<?= esc($log['created_at']) ?>">
+                                    <i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($log['created_at'])) ?><br>
+                                    <i class="bi bi-clock me-1"></i><?= date('H:i:s', strtotime($log['created_at'])) ?> WIB
+                                </span>
+                            </td>
 
-                                    <button class="btn btn-sm btn-light border rounded-circle" onclick="showDetail('<?= esc($log['no_wa']) ?>', '<?= esc($log['id_telegram'] ?? '-') ?>', '<?= esc($log['nama']) ?>', '<?= esc($log['tipe_aktivitas']) ?>', '<?= esc($log['created_at']) ?>', '<?= esc($log['id_hfm'] ?? '-') ?>')"><i class="bi bi-eye text-primary"></i></button>
-                                    <a href="<?= base_url('AdminDashboard/hapusLog/' . esc($log['id'] ?? '')) ?>" class="btn btn-sm btn-light border rounded-circle" data-confirm="Yakin ingin menghapus riwayat log ini?" data-confirm-title="Hapus riwayat log" data-confirm-button="Ya, hapus"><i class="bi bi-trash text-danger"></i></a>
+                            <td class="text-nowrap text-center px-1 px-md-3">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <button class="btn btn-sm btn-light border rounded-circle p-1 p-md-2" style="line-height: 1;" onclick="editIdLog('<?= esc($log['id_hfm'] ?? '') ?>')" title="Edit ID Trading"><i class="bi bi-pencil-square text-warning" style="font-size: 0.8rem;"></i></button>
+                                    <button class="btn btn-sm btn-light border rounded-circle p-1 p-md-2" style="line-height: 1;" onclick="showDetail('<?= esc($log['no_wa']) ?>', '<?= esc($log['id_telegram'] ?? '-') ?>', '<?= esc($log['nama']) ?>', '<?= esc($log['tipe_aktivitas']) ?>', '<?= esc($log['created_at']) ?>', '<?= esc($log['id_hfm'] ?? '-') ?>')"><i class="bi bi-eye text-primary" style="font-size: 0.8rem;"></i></button>
+
+                                    <button type="button" class="btn btn-sm btn-light border rounded-circle btn-hapus-log p-1 p-md-2" style="line-height: 1;"
+                                        data-id="<?= esc($log['id'] ?? '') ?>"
+                                        data-nama="<?= esc($log['nama']) ?>"
+                                        data-bs-toggle="modal" data-bs-target="#modalHapusLog">
+                                        <i class="bi bi-trash text-danger" style="font-size: 0.8rem;"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
+
+                        <tr id="expandLog<?= $log['id'] ?>" class="collapse d-md-none bg-light border-bottom">
+                            <td colspan="4" class="p-3 shadow-inner">
+                                <ul class="list-unstyled mb-0 small px-2">
+                                    <li class="mb-2">
+                                        <span class="fw-semibold d-block text-muted mb-1">Kontak (WA & Tele)</span>
+                                        <i class="bi bi-whatsapp text-success me-1"></i><?= esc($log['no_wa']) ?> &bull; <i class="bi bi-telegram text-info me-1"></i><?= esc($log['id_telegram'] ?? '-') ?>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="fw-semibold d-block text-muted mb-1">ID Trading</span>
+                                        <?php if (!empty($log['id_hfm'])): ?>
+                                            <span class="badge bg-white text-primary border border-primary-subtle px-2 py-1"><?= esc($log['id_hfm']) ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted fst-italic">-</span>
+                                        <?php endif; ?>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="fw-semibold d-block text-muted mb-1">Status IB</span>
+                                        <?php if ($statusMember == 'aktif'): ?>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Aktif</span>
+                                        <?php elseif ($statusMember == 'lepas_ib'): ?>
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">Lepas IB</span>
+                                        <?php elseif ($statusMember == 'keluar_grup'): ?>
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Keluar Grup</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">Tidak Terdaftar</span>
+                                        <?php endif; ?>
+                                    </li>
+                                    <li>
+                                        <span class="fw-semibold d-block text-muted mb-1">Waktu</span>
+                                        <i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($log['created_at'])) ?> &bull; <i class="bi bi-clock me-1"></i><?= date('H:i:s', strtotime($log['created_at'])) ?> WIB
+                                    </li>
+                                </ul>
+                            </td>
+                        </tr>
+
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
@@ -224,25 +282,17 @@
             </span>
             <nav>
                 <ul class="pagination pagination-sm mb-0 flex-wrap">
-                    
-                    <!-- 1. Tombol Previous -->
                     <li class="page-item <?= $currentPage == 1 ? 'disabled' : '' ?>">
-                        <a class="page-link shadow-sm rounded-start-pill" href="<?= $currentPage > 1 ? '?page='.($currentPage - 1).'&search='.urlencode($search).'&tipe='.urlencode($tipe).'&status='.urlencode($status ?? '').'&date_from='.urlencode($date_from).'&date_to='.urlencode($date_to) : '#' ?>">&laquo;</a>
+                        <a class="page-link shadow-sm rounded-start-pill" href="<?= $currentPage > 1 ? '?page=' . ($currentPage - 1) . '&search=' . urlencode($search) . '&tipe=' . urlencode($tipe) . '&status=' . urlencode($status ?? '') . '&date_from=' . urlencode($date_from) . '&date_to=' . urlencode($date_to) : '#' ?>">&laquo;</a>
                     </li>
-
                     <?php
-                    // LOGIKA PEMBATASAN HALAMAN (Maksimal 5 tombol di tengah)
                     $maxVisibleButtons = 5;
                     $startPage = max(1, $currentPage - floor($maxVisibleButtons / 2));
                     $endPage = min($totalPages, $startPage + $maxVisibleButtons - 1);
-
-                    // Penyesuaian jika ada di ujung akhir halaman
                     if ($endPage - $startPage + 1 < $maxVisibleButtons) {
                         $startPage = max(1, $endPage - $maxVisibleButtons + 1);
                     }
                     ?>
-
-                    <!-- 2. Halaman Pertama & Titik-titik (Ellipsis) -->
                     <?php if ($startPage > 1): ?>
                         <li class="page-item">
                             <a class="page-link shadow-sm" href="?page=1&search=<?= urlencode($search) ?>&tipe=<?= urlencode($tipe) ?>&status=<?= urlencode($status ?? '') ?>&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>">1</a>
@@ -253,15 +303,11 @@
                             </li>
                         <?php endif; ?>
                     <?php endif; ?>
-
-                    <!-- 3. Render Tombol Angka Utama -->
                     <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
                         <li class="page-item <?= $i == $currentPage ? 'active' : '' ?>">
                             <a class="page-link shadow-sm" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&tipe=<?= urlencode($tipe) ?>&status=<?= urlencode($status ?? '') ?>&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>"><?= $i ?></a>
                         </li>
                     <?php endfor; ?>
-
-                    <!-- 4. Tampilkan Titik-titik & Halaman Terakhir -->
                     <?php if ($endPage < $totalPages): ?>
                         <?php if ($endPage < $totalPages - 1): ?>
                             <li class="page-item disabled">
@@ -272,12 +318,9 @@
                             <a class="page-link shadow-sm" href="?page=<?= $totalPages ?>&search=<?= urlencode($search) ?>&tipe=<?= urlencode($tipe) ?>&status=<?= urlencode($status ?? '') ?>&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>"><?= $totalPages ?></a>
                         </li>
                     <?php endif; ?>
-
-                    <!-- 5. Tombol Next -->
                     <li class="page-item <?= $currentPage == $totalPages ? 'disabled' : '' ?>">
-                        <a class="page-link shadow-sm rounded-end-pill" href="<?= $currentPage < $totalPages ? '?page='.($currentPage + 1).'&search='.urlencode($search).'&tipe='.urlencode($tipe).'&status='.urlencode($status ?? '').'&date_from='.urlencode($date_from).'&date_to='.urlencode($date_to) : '#' ?>">&raquo;</a>
+                        <a class="page-link shadow-sm rounded-end-pill" href="<?= $currentPage < $totalPages ? '?page=' . ($currentPage + 1) . '&search=' . urlencode($search) . '&tipe=' . urlencode($tipe) . '&status=' . urlencode($status ?? '') . '&date_from=' . urlencode($date_from) . '&date_to=' . urlencode($date_to) : '#' ?>">&raquo;</a>
                     </li>
-                    
                 </ul>
             </nav>
         </div>
@@ -286,10 +329,10 @@
 
 <div class="modal fade" id="modalDetail" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content shadow-lg border-0">
+        <div class="modal-content shadow-lg">
             <div class="modal-header border-0 pb-0">
                 <h5 class="fw-bold mb-0"><i class="bi bi-info-circle text-primary me-2"></i>Detail Aktivitas</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
                 <div class="mb-3">
@@ -326,10 +369,10 @@
 
 <div class="modal fade" id="modalEditId" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content shadow-lg border-0">
+        <div class="modal-content shadow-lg">
             <div class="modal-header border-0 pb-0">
                 <h5 class="fw-bold mb-0"><i class="bi bi-pencil-square text-warning me-2"></i>Edit ID Trading</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="<?= base_url('admin/update-id-quick') ?>" method="POST">
                 <div class="modal-body p-4">
@@ -342,10 +385,30 @@
                     </div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-warning rounded-pill px-3 fw-semibold">Simpan ID</button>
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-semibold">Simpan ID</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalHapusLog" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content shadow-lg">
+            <div class="modal-body p-4 text-center">
+                <div class="display-6 text-danger mb-3"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <h5 class="fw-bold mb-2">Hapus Riwayat Log?</h5>
+                <p class="text-muted small">Apakah Anda yakin ingin menghapus data log aktivitas atas nama <br>
+                    <strong class="text-dark" id="teksNamaHapusLog"></strong> secara permanen?
+                </p>
+                <div class="d-grid gap-2 mt-4">
+                    <a href="#" id="linkHapusLogModal" class="btn btn-danger rounded-pill py-2 fw-semibold">
+                        <i class="bi bi-trash3 me-2"></i>Ya, Hapus Permanen
+                    </a>
+                    <button type="button" class="btn btn-link text-muted btn-sm text-decoration-none" data-bs-dismiss="modal">Batalkan</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -398,6 +461,18 @@
             if (e.key === 'Enter') {
                 this.closest('form').submit();
             }
+        });
+    });
+
+    document.querySelectorAll('.btn-hapus-log').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const nama = this.getAttribute('data-nama');
+
+            document.getElementById('teksNamaHapusLog').innerText = nama;
+
+            const linkHapus = document.getElementById('linkHapusLogModal');
+            if (linkHapus) linkHapus.href = "<?= base_url('AdminDashboard/hapusLog/') ?>" + id;
         });
     });
 </script>

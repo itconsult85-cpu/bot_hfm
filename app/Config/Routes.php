@@ -92,18 +92,11 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
         $routes->get('clear-all', 'ChatLogTele::clearAll'); // Tombol hapus semua log
     });
 
-    // Tambahkan baris ini di dalam app/Config/Routes.php
     $routes->get('chat-logs/getDetailChat/(:any)', 'ChatLogTele::getDetailChat/$1');
-    // ==========================================
-    // TAMBAHKAN ROUTE HAPUS LOG DI SINI
-    // ==========================================
     $routes->get('AdminDashboard/hapusLog/(:num)', 'AdminDashboard::hapusLog/$1');
     $routes->get('AdminDashboard/backupDatabase', 'AdminDashboard::backupDatabase');
 });
 
-// ==========================================================
-// JALUR API KHUSUS UNTUK BOT WHATSAPP (NODE.JS)
-// ==========================================================
 $routes->get('client', 'Client::index');
 $routes->get('client/check_status_vip/(:any)', 'Client::check_status_vip/$1');
 $routes->get('client/getPanduanMedia/(:any)', 'Client::getPanduanMedia/$1');

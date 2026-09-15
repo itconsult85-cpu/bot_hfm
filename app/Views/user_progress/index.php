@@ -1,199 +1,233 @@
 <?= $this->extend('layout/template') ?>
 
 <?= $this->section('content') ?>
-<div class="container-fluid mt-3">
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-        <div>
-            <h3 class="fw-bold tracking-tight mb-1">
-                <i class="bi bi-person-lines-fill text-primary me-2"></i><?= esc($title ?? 'Progress Pendaftar') ?>
-            </h3>
-            <p class="text-muted small mb-0">Pantau tahap pendaftaran member secara realtime dari bot Telegram.</p>
+<style>
+    .chat-sidebar {
+        height: 30vh;
+        min-height: 250px;
+        overflow-y: auto;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .chat-main {
+        height: 55vh;
+        min-height: 400px;
+        background-color: #efeae2;
+        /* Warna soft ala chat web */
+    }
+
+    @media (min-width: 768px) {
+        .chat-sidebar {
+            height: 70vh;
+            min-height: 600px;
+            border-bottom: none;
+            border-right: 1px solid #dee2e6;
+        }
+
+        .chat-main {
+            height: 70vh;
+            min-height: 600px;
+        }
+    }
+
+    .user-item {
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        border-left: 4px solid transparent;
+    }
+
+    .user-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .user-item.active {
+        background-color: #e9ecef;
+        border-left-color: #0d6efd;
+    }
+
+    .chat-sidebar::-webkit-scrollbar,
+    .chat-history::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-sidebar::-webkit-scrollbar-thumb,
+    .chat-history::-webkit-scrollbar-thumb {
+        background: #ced4da;
+        border-radius: 4px;
+    }
+</style>
+
+<div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mt-2 mb-4">
+    <div class="row align-items-md-center justify-content-between mb-3 g-3">
+        <div class="col-12 col-md">
+            <h4 class="fw-bold tracking-tight text-primary mb-1" style="font-size: 1.25rem;">
+                <i class="bi bi-chat-dots me-2"></i><?= esc($title ?? 'Log Obrolan Telegram') ?>
+            </h4>
+            <p class="text-muted small mb-0" style="font-size: 0.8rem;">Pantau percakapan bot Telegram dengan pengguna secara real-time.</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="<?= base_url('user-progress') ?>" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold shadow-sm">
-                <i class="bi bi-arrow-clockwise me-1"></i> Reset Filter
-            </a>
+        <div class="col-12 col-md-auto">
+            <button type="button" class="btn btn-danger rounded-pill w-100 px-4 py-2 small fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalBersihkanLog">
+                <i class="bi bi-trash3 me-1"></i> Bersihkan Log
+            </button>
         </div>
     </div>
 
     <?php if (session()->getFlashdata('pesan')): ?>
-        <div class="alert alert-success alert-dismissible fade show rounded-pill px-4 py-2 mb-4 shadow-sm" role="alert">
-            <i class="bi bi-check-circle-fill me-2"></i><?= session()->getFlashdata('pesan') ?>
+        <div class="alert alert-success alert-dismissible fade show rounded-pill px-4 py-2 mb-3 shadow-sm" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> <?= session()->getFlashdata('pesan') ?>
             <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     <?php endif; ?>
 
-    <div class="card shadow-sm border-0 rounded-4 p-3 mb-4 bg-white">
-        <form method="GET" action="<?= base_url('user-progress') ?>" class="row g-3 align-items-center">
-            <div class="col-md-5">
-                <div class="input-group">
-                    <span class="input-group-text bg-light border-end-0 rounded-start-pill ps-3"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" class="form-control border-start-0 bg-light rounded-end-pill" name="search" placeholder="Cari berdasarkan Nama atau ID Telegram..." value="<?= esc($search ?? '') ?>">
-                </div>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select rounded-pill bg-light" name="step">
-                    <option value="">Semua Tahap (Step)</option>
-                    <?php for ($i = 1; $i <= 7; $i++): ?>
-                        <option value="<?= $i ?>" <?= (isset($step_filter) && $step_filter == $i) ? 'selected' : '' ?>>Step <?= $i ?></option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <div class="col-md-4 d-flex gap-2">
-                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold shadow-sm flex-grow-1">
-                    <i class="bi bi-filter me-1"></i> Filter Data
-                </button>
-                <?php if (!empty($search) || !empty($step_filter)): ?>
-                    <a href="<?= base_url('user-progress') ?>" class="btn btn-light border rounded-pill px-3 text-danger fw-semibold" title="Hapus Filter">
-                        <i class="bi bi-x-lg"></i>
-                    </a>
-                <?php endif; ?>
-            </div>
-        </form>
-    </div>
+    <div class="card border border-light-subtle rounded-4 overflow-hidden shadow-sm">
+        <div class="row g-0">
 
-    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th class="py-3 border-bottom-0">No</th>
-                        <th class="py-3 border-bottom-0 ps-4">Telegram ID</th>
-                        <th class="py-3 border-bottom-0">Nama User</th>
-                        <th class="py-3 border-bottom-0 text-center">Tahap Saat Ini</th>
-                        <th class="py-3 border-bottom-0 text-center">Terakhir Aktif</th>
-                        <th class="py-3 border-bottom-0 text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($progress)): ?>
-                        <tr>
-                            <td colspan="6" class="text-center py-5">
-                                <div class="empty-state">
-                                    <i class="bi bi-person-x text-muted" style="font-size: 3rem;"></i>
-                                    <h6 class="fw-bold mt-3">Belum Ada Data Progress</h6>
-                                    <p class="text-muted small">Tidak ada data yang cocok dengan kriteria pencarian.</p>
-                                </div>
-                            </td>
-                        </tr>
+            <div class="col-12 col-md-4 col-lg-3 bg-white chat-sidebar d-flex flex-column">
+                <div class="p-3 border-bottom shadow-sm z-1 sticky-top bg-white">
+                    <h6 class="fw-bold mb-2 text-dark" style="font-size: 0.9rem;"><i class="bi bi-people-fill me-2 text-primary"></i>Daftar User ID</h6>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" id="searchChatLog" class="form-control border-start-0 bg-light px-1" placeholder="Cari ID Telegram..." onkeyup="filterChatList()">
+                    </div>
+                </div>
+                <div id="contactList" class="flex-grow-1 overflow-auto">
+                    <?php if (empty($users)): ?>
+                        <div class="p-4 text-center text-muted small">Belum ada riwayat percakapan.</div>
                     <?php else: ?>
-                        <?php $no = 1; foreach ($progress as $p): ?>
-                            <tr>
-                                <td><?= $no++ ?></td>
-                                <td class="fw-semibold ps-4 text-secondary">
-                                    <i class="bi bi-telegram text-primary me-1"></i> <?= esc($p['user_id']) ?>
-                                </td>
-                                <td>
-                                    <span class="fw-bold text-dark"><?= esc($p['user_name'] ?? 'Tanpa Nama') ?></span>
-                                </td>
-                                <td class="text-center">
-                                    <?php
-                                    $step = (int)$p['current_step'];
-                                    $badgeColor = 'bg-secondary';
-                                    if ($step == 7) $badgeColor = 'bg-success';
-                                    elseif ($step >= 4) $badgeColor = 'bg-info text-dark';
-                                    elseif ($step >= 2) $badgeColor = 'bg-primary';
-                                    ?>
-                                    <span class="badge <?= $badgeColor ?> rounded-pill px-3 py-2 shadow-sm">
-                                        Step <?= esc($p['current_step']) ?>
+                        <?php foreach ($users as $user): ?>
+                            <div class="user-item p-3 border-bottom" data-phone="<?= esc($user['phone_number']) ?>" onclick="loadChat(this)">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold text-dark text-truncate" style="font-size: 0.85rem;">
+                                        <i class="bi bi-person-circle me-1 text-primary"></i> <?= esc($user['phone_number']) ?>
                                     </span>
-                                </td>
-                                <td class="text-center text-muted small">
-                                    <i class="bi bi-clock me-1"></i> <?= date('d M Y, H:i', strtotime($p['last_active'])) ?>
-                                </td>
-                                <td class="text-center">
-                                    <a href="<?= base_url('user-progress/delete/' . $p['user_id']) ?>" class="btn btn-sm btn-light border text-danger rounded-pill px-3 fw-semibold shadow-sm" data-confirm="Yakin ingin mereset riwayat user ini kembali ke Step 1?" data-confirm-title="Reset riwayat user" data-confirm-button="Ya, reset">
-                                        <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
-                                    </a>
-                                </td>
-                            </tr>
+                                </div>
+                                <div class="text-muted" style="font-size: 0.7rem;">
+                                    <i class="bi bi-clock-history me-1"></i><?= date('d M, H:i', strtotime($user['last_active'])) ?>
+                                </div>
+                            </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
-                </tbody>
-            </table>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-8 col-lg-9 d-flex flex-column p-0">
+                <div class="chat-header p-3 bg-white border-bottom shadow-sm z-1 d-flex align-items-center">
+                    <div class="bg-primary-subtle text-primary rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 45px; height: 45px;">
+                        <i class="bi bi-telegram fs-4"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0 fw-bold text-dark" id="activeChatName">Pilih kontak...</h6>
+                        <small class="text-muted" id="activeChatPhone">Klik ID di sebelah kiri</small>
+                    </div>
+                </div>
+
+                <div class="chat-history chat-main flex-grow-1 overflow-auto p-3 p-md-4" id="chatHistory">
+                    <div class="h-100 d-flex flex-column justify-content-center align-items-center text-muted">
+                        <i class="bi bi-chat-square-dots opacity-50 mb-3" style="font-size: 4rem;"></i>
+                        <p class="small bg-white px-3 py-1 rounded-pill shadow-sm">Pilih chat untuk melihat riwayat percakapan</p>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
-
-    <!-- PAGER / PAGINATION SECTION (GAYA BOSSCUAN) -->
-    <?php if (isset($pager) && $pager->getPageCount('default') > 1): ?>
-        <?php
-        // Ambil info halaman dari sistem CodeIgniter
-        $currentPage = $pager->getCurrentPage('default');
-        $totalPages  = $pager->getPageCount('default');
-        $totalData   = $pager->getTotal('default');
-        $perPage     = $pager->getPerPage('default') ?? 10;
-
-        // Siapkan parameter URL agar filter (Pencarian & Step) tidak hilang saat pindah halaman
-        $qs = [];
-        if (!empty($search)) $qs['search'] = $search;
-        if (!empty($step_filter)) $qs['step'] = $step_filter;
-        $queryStr = !empty($qs) ? '&' . http_build_query($qs) : '';
-        ?>
-
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4">
-            <span class="text-muted small mb-2 mb-md-0">
-                Menampilkan <b><?= ($currentPage - 1) * $perPage + 1 ?></b> hingga <b><?= min($currentPage * $perPage, $totalData) ?></b> dari <b><?= number_format($totalData) ?></b> data
-            </span>
-            <nav>
-                <ul class="pagination pagination-sm mb-0 flex-wrap">
-
-                    <!-- 1. Tombol Previous -->
-                    <li class="page-item <?= $currentPage == 1 ? 'disabled' : '' ?>">
-                        <a class="page-link shadow-sm rounded-start-pill" href="<?= $currentPage > 1 ? '?page=' . ($currentPage - 1) . $queryStr : '#' ?>">&laquo;</a>
-                    </li>
-
-                    <?php
-                    // LOGIKA PEMBATASAN HALAMAN (Maksimal 5 tombol di tengah)
-                    $maxVisibleButtons = 5;
-                    $startPage = max(1, $currentPage - floor($maxVisibleButtons / 2));
-                    $endPage = min($totalPages, $startPage + $maxVisibleButtons - 1);
-
-                    // Penyesuaian jika ada di ujung akhir halaman
-                    if ($endPage - $startPage + 1 < $maxVisibleButtons) {
-                        $startPage = max(1, $endPage - $maxVisibleButtons + 1);
-                    }
-                    ?>
-
-                    <!-- 2. Halaman Pertama & Titik-titik (Ellipsis) -->
-                    <?php if ($startPage > 1): ?>
-                        <li class="page-item">
-                            <a class="page-link shadow-sm" href="?page=1<?= $queryStr ?>">1</a>
-                        </li>
-                        <?php if ($startPage > 2): ?>
-                            <li class="page-item disabled">
-                                <span class="page-link shadow-sm border-0 text-muted">...</span>
-                            </li>
-                        <?php endif; ?>
-                    <?php endif; ?>
-
-                    <!-- 3. Render Tombol Angka Utama -->
-                    <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
-                        <li class="page-item <?= $i == $currentPage ? 'active' : '' ?>">
-                            <a class="page-link shadow-sm" href="?page=<?= $i ?><?= $queryStr ?>"><?= $i ?></a>
-                        </li>
-                    <?php endfor; ?>
-
-                    <!-- 4. Tampilkan Titik-titik & Halaman Terakhir -->
-                    <?php if ($endPage < $totalPages): ?>
-                        <?php if ($endPage < $totalPages - 1): ?>
-                            <li class="page-item disabled">
-                                <span class="page-link shadow-sm border-0 text-muted">...</span>
-                            </li>
-                        <?php endif; ?>
-                        <li class="page-item">
-                            <a class="page-link shadow-sm" href="?page=<?= $totalPages ?><?= $queryStr ?>"><?= $totalPages ?></a>
-                        </li>
-                    <?php endif; ?>
-
-                    <!-- 5. Tombol Next -->
-                    <li class="page-item <?= $currentPage == $totalPages ? 'disabled' : '' ?>">
-                        <a class="page-link shadow-sm rounded-end-pill" href="<?= $currentPage < $totalPages ? '?page=' . ($currentPage + 1) . $queryStr : '#' ?>">&raquo;</a>
-                    </li>
-
-                </ul>
-            </nav>
-        </div>
-    <?php endif; ?>
-
 </div>
+
+<div class="modal fade" id="modalBersihkanLog" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-body p-4 text-center">
+                <div class="display-6 text-danger mb-3"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <h5 class="fw-bold mb-2">Bersihkan Semua Log?</h5>
+                <p class="text-muted small">Apakah Anda yakin ingin menghapus <strong>SELURUH</strong> riwayat obrolan dari database secara permanen? Tindakan ini tidak dapat dibatalkan.</p>
+                <div class="d-grid gap-2 mt-4">
+                    <a href="<?= base_url('chat-logs/clear-all') ?>" class="btn btn-danger rounded-pill py-2 fw-semibold">
+                        <i class="bi bi-trash3 me-2"></i>Ya, Hapus Semua
+                    </a>
+                    <button type="button" class="btn btn-link text-muted btn-sm text-decoration-none" data-bs-dismiss="modal">Batalkan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?= $this->endSection() ?>
+
+<?= $this->section('scripts') ?>
+<script>
+    function filterChatList() {
+        let input = document.getElementById("searchChatLog").value.toLowerCase();
+        let items = document.querySelectorAll(".user-item");
+
+        items.forEach(item => {
+            let idText = item.getAttribute("data-phone").toLowerCase();
+            if (idText.includes(input)) {
+                item.style.display = "block";
+            } else {
+                item.style.display = "none";
+            }
+        });
+    }
+
+    function loadChat(element) {
+        document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
+        element.classList.add('active');
+
+        const phone = element.getAttribute('data-phone');
+        const chatHistoryBox = document.getElementById('chatHistory');
+
+        document.getElementById('activeChatName').innerText = "ID Telegram: " + phone;
+        document.getElementById('activeChatPhone').innerText = "Log percakapan aktif";
+
+        chatHistoryBox.innerHTML = '<div class="h-100 d-flex flex-column justify-content-center align-items-center"><div class="spinner-border text-primary" role="status"></div><p class="text-muted mt-3 small">Memuat percakapan...</p></div>';
+
+        fetch(`<?= base_url('chat-logs/getDetailChat/') ?>${phone}`)
+            .then(response => response.json())
+            .then(data => {
+                chatHistoryBox.innerHTML = '';
+                if (data.length === 0) {
+                    chatHistoryBox.innerHTML = '<div class="text-center mt-5 text-muted small bg-white d-inline-block px-3 py-1 rounded-pill shadow-sm">Data chat kosong.</div>';
+                    return;
+                }
+
+                data.forEach(chat => {
+                    const isUser = (chat.sender !== 'bot' && chat.sender !== 'admin');
+
+                    const wrapper = document.createElement('div');
+                    wrapper.className = `d-flex w-100 mb-3 ${isUser ? 'justify-content-end' : 'justify-content-start'}`;
+
+                    const bubble = document.createElement('div');
+                    bubble.className = `p-2 px-3 shadow-sm rounded-4 ${isUser ? 'bg-success-subtle text-dark border border-success-subtle rounded-top-end-0' : 'bg-white border border-light-subtle rounded-top-start-0'}`;
+                    bubble.style.maxWidth = "85%";
+
+                    let senderLabel = "";
+                    if (chat.sender === 'admin') {
+                        senderLabel = `<div class="fw-bold text-primary mb-1" style="font-size: 0.7rem;"><i class="bi bi-person-badge"></i> ADMIN</div>`;
+                    } else if (chat.sender === 'bot') {
+                        senderLabel = `<div class="fw-bold text-info mb-1" style="font-size: 0.7rem;"><i class="bi bi-robot"></i> BOT</div>`;
+                    }
+
+                    const timeText = new Date(chat.created_at).toLocaleString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        day: '2-digit',
+                        month: 'short'
+                    });
+
+                    bubble.innerHTML = `
+                        ${senderLabel}
+                        <div style="word-break: break-word; font-size: 0.85rem; line-height: 1.4;">${chat.message}</div>
+                        <div class="text-end text-muted mt-1 opacity-75" style="font-size: 0.65rem;">${timeText}</div>
+                    `;
+
+                    wrapper.appendChild(bubble);
+                    chatHistoryBox.appendChild(wrapper);
+                });
+
+                chatHistoryBox.scrollTop = chatHistoryBox.scrollHeight;
+            })
+            .catch(error => {
+                chatHistoryBox.innerHTML = '<div class="text-center mt-5 text-danger small"><i class="bi bi-exclamation-circle me-1"></i> Gagal memuat percakapan.</div>';
+            });
+    }
+</script>
 <?= $this->endSection() ?>

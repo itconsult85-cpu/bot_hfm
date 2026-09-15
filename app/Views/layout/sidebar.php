@@ -5,10 +5,8 @@
     </div>
 
     <?php
-    // Ambil path URI saat ini untuk pengecekan menu aktif
     $uri = uri_string();
 
-    // Logika untuk mengecek apakah submenu Bot Settings atau Bot Data sedang aktif
     $isBotSettings = strpos($uri, 'bot-global') === 0 || strpos($uri, 'bot-flow') === 0 || strpos($uri, 'bot-faq') === 0 || strpos($uri, 'activity-reminder-phases') === 0 || strpos($uri, 'bot-schedules') === 0;
     $isBotData = strpos($uri, 'user-progress') === 0 || strpos($uri, 'chat-logs') === 0 || strpos($uri, 'activity-reminders') === 0;
     ?>
@@ -37,7 +35,6 @@
 
         <div class="menu-title mt-2">Bot Telegram (Dinamic)</div>
 
-        <!-- PENGATURAN BOT -->
         <a class="sidebar-menu-link <?= $isBotSettings ? 'active' : '' ?>" data-bs-toggle="collapse" href="#collapseBotSettings" role="button" aria-expanded="<?= $isBotSettings ? 'true' : 'false' ?>">
             <i class="bi bi-robot"></i> Pengaturan Bot <i class="bi bi-chevron-down ms-auto" style="font-size: 0.8rem;"></i>
         </a>
@@ -51,7 +48,6 @@
             </div>
         </div>
 
-        <!-- DATA BOT -->
         <a class="sidebar-menu-link <?= $isBotData ? 'active' : '' ?>" data-bs-toggle="collapse" href="#collapseBotData" role="button" aria-expanded="<?= $isBotData ? 'true' : 'false' ?>">
             <i class="bi bi-database-fill"></i> Data Bot <i class="bi bi-chevron-down ms-auto" style="font-size: 0.8rem;"></i>
         </a>

@@ -1,14 +1,20 @@
 <?= $this->extend('layout/template') ?>
 
 <?= $this->section('content') ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h4 class="fw-bold mb-1"><?= $title ?></h4>
-        <p class="text-muted small mb-0">Pantau percakapan bot Telegram dengan pengguna secara real-time.</p>
+<div class="row align-items-md-center justify-content-between mb-3 g-3">
+    <div class="col-12 col-md">
+        <h4 class="fw-bold tracking-tight text-primary mb-1" style="font-size: 1.25rem;">
+            <i class="bi bi-chat-dots me-2"></i><?= esc($title ?? 'Log Obrolan Telegram') ?>
+        </h4>
+        <p class="text-muted small mb-0" style="font-size: 0.8rem;">Pantau percakapan bot Telegram dengan pengguna secara real-time.</p>
     </div>
-    <a href="<?= base_url('chat-logs/clear-all') ?>" class="btn btn-sm btn-danger rounded-pill fw-semibold" data-confirm="Yakin ingin menghapus SELURUH riwayat obrolan dari database?" data-confirm-title="Hapus seluruh riwayat chat" data-confirm-button="Ya, hapus semua">
-        <i class="bi bi-trash3 me-1"></i> Bersihkan Log
-    </a>
+    <div class="col-12 col-md-auto">
+        <div class="d-grid d-md-block text-md-end">
+            <button type="button" class="btn btn-danger rounded-pill px-4 py-2 small fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalBersihkanLog">
+                <i class="bi bi-trash3 me-1"></i> Bersihkan Log
+            </button>
+        </div>
+    </div>
 </div>
 
 <?php if (session()->getFlashdata('pesan')): ?>
@@ -19,7 +25,6 @@
     <div class="user-list">
         <div class="p-3 bg-white border-bottom sticky-top">
             <h6 class="fw-bold mb-2 text-muted"><i class="bi bi-people-fill me-2"></i>Daftar User ID</h6>
-            <!-- KOTAK PENCARIAN BARU -->
             <div class="input-group input-group-sm">
                 <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
                 <input type="text" id="searchChatLog" class="form-control border-start-0 ps-0" placeholder="Cari ID Telegram..." onkeyup="filterChatList()">
@@ -58,6 +63,26 @@
             <div class="h-100 d-flex flex-column justify-content-center align-items-center text-muted">
                 <i class="bi bi-chat-square-text fs-1 mb-2"></i>
                 <p>Pilih chat untuk melihat riwayat percakapan</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Bersihkan Log (Seragam) -->
+<div class="modal fade" id="modalBersihkanLog" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-body p-4 text-center">
+                <div class="display-6 text-danger mb-3"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <h5 class="fw-bold mb-2">Bersihkan Semua Log?</h5>
+                <p class="text-muted small">Apakah Anda yakin ingin menghapus <strong>SELURUH</strong> riwayat obrolan dari database secara permanen? Tindakan ini tidak dapat dibatalkan.</p>
+                <div class="d-grid gap-2 mt-4">
+                    <!-- Link ini yang akan mengeksekusi penghapusan -->
+                    <a href="<?= base_url('chat-logs/clear-all') ?>" class="btn btn-danger rounded-pill py-2 fw-semibold">
+                        <i class="bi bi-trash3 me-2"></i>Ya, Hapus Semua
+                    </a>
+                    <button type="button" class="btn btn-link text-muted btn-sm text-decoration-none" data-bs-dismiss="modal">Batalkan</button>
+                </div>
             </div>
         </div>
     </div>

@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Libraries\ActivityReminderService;
 use Config\Database;
+
 class ActivityReminder extends BaseController
 {
     private ActivityReminderService $service;
@@ -26,11 +27,12 @@ class ActivityReminder extends BaseController
         $result = $this->service->sendDue();
         return redirect()->to('/activity-reminders')->with('pesan', sprintf(
             'Proses selesai: %d terkirim, %d sudah pernah terkirim, %d gagal.',
-            $result['sent'], $result['skipped'], $result['failed']
+            $result['sent'],
+            $result['skipped'],
+            $result['failed']
         ));
     }
 
-    // Dipanggil scheduler bot pada pukul 08:00 WIB.
     public function runScheduled()
     {
         $result = $this->service->sendDue();
@@ -41,7 +43,6 @@ class ActivityReminder extends BaseController
         ]);
     }
 
-    // Hanya dijalankan setelah admin menekan tombol hapus.
     public function remove($id)
     {
         $db = Database::connect();
@@ -76,5 +77,4 @@ class ActivityReminder extends BaseController
         curl_exec($ch);
         curl_close($ch);
     }
-
 }

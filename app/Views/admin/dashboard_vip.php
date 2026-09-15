@@ -5,14 +5,12 @@
     <meta charset="UTF-8">
     <title>VIP Console - HFM Manager</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Bootstrap 5.3 & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="<?= base_url('assets/css/dashboard.css') ?>">
 </head>
 
 <body class="vip-console">
-    <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-white bg-white border-bottom sticky-top py-3 shadow-sm">
         <div class="container">
             <span class="navbar-brand text-primary fs-4"><i class="bi bi-graph-up-arrow me-2"></i>VIP Console</span>
@@ -21,13 +19,11 @@
     </nav>
 
     <div class="container py-5">
-        <!-- HEADER -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h3 class="fw-bold tracking-tight mb-1">Manajemen Member VIP</h3>
                 <p class="text-muted small mb-0">Total Member Terdata: <span class="fw-bold text-dark"><?= count($members) ?></span> Akun</p>
             </div>
-            <!-- Notifikasi Flashdata (Jika ada pesan sukses update/delete) -->
             <?php if (session()->getFlashdata('pesan')): ?>
                 <div class="alert alert-success alert-dismissible fade show rounded-pill px-4 py-2" role="alert">
                     <i class="bi bi-check-circle-fill me-2"></i><?= session()->getFlashdata('pesan') ?>
@@ -36,14 +32,12 @@
             <?php endif; ?>
         </div>
 
-        <!-- LIST DATA CARD -->
         <div class="row justify-content-center g-3">
             <?php foreach ($members as $m): ?>
                 <div class="col-lg-10 col-12">
                     <div class="card data-card p-3 shadow-sm">
                         <div class="row align-items-center g-3">
 
-                            <!-- Avatar & Info Utama -->
                             <div class="col-auto">
                                 <div class="avatar-sub"><i class="bi bi-person-fill"></i></div>
                             </div>
@@ -52,16 +46,13 @@
                                 <span class="text-muted small"><i class="bi bi-whatsapp me-1 text-success"></i><?= esc($m['no_wa']) ?></span>
                             </div>
 
-                            <!-- Info Deposit -->
                             <div class="col-md-2 col-6">
                                 <p class="mb-0 text-muted" style="font-size: 0.75rem;">Deposit</p>
                                 <span class="fw-bold text-dark">
-                                    <!-- Tampilkan Currency di Sini -->
                                     <?= esc($m['currency'] ?? 'USD') ?> <?= number_format($m['deposit'], 2) ?>
                                 </span>
                             </div>
 
-                            <!-- Status Aktif / Lepas IB -->
                             <div class="col-md-2 col-6">
                                 <?php if ($m['status'] === 'aktif'): ?>
                                     <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2 small fw-semibold"><i class="bi bi-check-circle me-1"></i>Aktif</span>
@@ -70,7 +61,6 @@
                                 <?php endif; ?>
                             </div>
 
-                            <!-- Status Last Trade -->
                             <div class="col-md-2 col-6">
                                 <?php if (empty($m['last_trade']) || $m['last_trade'] === '0000-00-00 00:00:00'): ?>
                                     <span class="badge bg-light text-muted border rounded-pill px-3 py-2 small fw-semibold"><i class="bi bi-clock-history me-1"></i>Belum Trade</span>
@@ -79,7 +69,6 @@
                                 <?php endif; ?>
                             </div>
 
-                            <!-- Tombol Aksi (Update & Delete) -->
                             <div class="col-md-2 col-12 text-md-end text-start">
                                 <button class="btn btn-light btn-sm rounded-circle p-2 me-1 btn-edit shadow-sm border"
                                     data-id="<?= $m['id_hfm'] ?>"
@@ -105,7 +94,6 @@
         </div>
     </div>
 
-    <!-- MODAL EDIT DATA -->
     <div class="modal fade" id="modalEdit" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
@@ -161,7 +149,6 @@
         </div>
     </div>
 
-    <!-- MODAL HAPUS DATA -->
     <div class="modal fade" id="modalHapus" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
             <div class="modal-content shadow-lg">
@@ -179,10 +166,8 @@
         </div>
     </div>
 
-    <!-- SCRIPT BOOTSTRAP & JAVASCRIPT -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Logika Modal Edit
         document.querySelectorAll('.btn-edit').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.getElementById('edit_id').value = this.getAttribute('data-id');
@@ -195,7 +180,6 @@
             });
         });
 
-        // Logika Modal Hapus
         document.querySelectorAll('.btn-hapus').forEach(btn => {
             btn.addEventListener('click', function() {
                 const id = this.getAttribute('data-id');

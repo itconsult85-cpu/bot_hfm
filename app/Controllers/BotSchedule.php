@@ -50,7 +50,6 @@ class BotSchedule extends BaseController
     public function restartBot()
     {
         // Menggunakan API internal Node.js di port 3000 untuk restart
-        // Ini menghindari masalah permission sudo/www-data pada server Linux
         $db = Database::connect();
         $tokenRow = $db->table('bot_globals')->where('key_name', 'BOT_CONTROL_TOKEN')->get()->getRowArray();
         $token = $tokenRow ? trim((string) $tokenRow['key_value']) : '';
@@ -133,6 +132,3 @@ class BotSchedule extends BaseController
         }
     }
 }
-
-// Menjalankan ulang proses PM2 dilakukan oleh endpoint Node bot yang terproteksi,
-// bukan oleh PHP melalui exec agar akun web tidak mendapatkan akses shell umum.

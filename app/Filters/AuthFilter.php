@@ -15,8 +15,5 @@ class AuthFilter implements FilterInterface
         }
     }
 
-    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
-    {
-        // Tidak perlu aksi setelah request
-    }
+    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null) {}
 }

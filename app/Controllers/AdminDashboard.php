@@ -437,7 +437,7 @@ class AdminDashboard extends BaseController
                 $deposit_real = max($depo, $bal, $equity);
 
                 // Bersihkan string Last Trade dari milidetik
-                    $last_trade_real = null;
+                $last_trade_real = null;
                 $raw_last_trade = $dataApi['last_trade'] ?? 'N/A';
                 if (!empty($raw_last_trade) && $raw_last_trade !== 'N/A' && preg_match('/^20\d{2}/', $raw_last_trade)) {
                     $last_trade_real = date('Y-m-d H:i:s', strtotime(substr($raw_last_trade, 0, 19)));

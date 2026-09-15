@@ -92,6 +92,7 @@
 </div>
 
 <div class="row g-3" id="memberContainer">
+    <?php $no = 1; ?>
     <?php foreach ($members as $m): ?>
         <div class="col-12 member-item"
             data-nama="<?= strtolower(esc($m['nama'] ?? '')) ?>"
@@ -101,44 +102,53 @@
             data-status="<?= esc($m['status']) ?>"
             data-currency="<?= esc($m['currency'] ?? 'USD') ?>">
             <div class="card data-card p-3">
-                <div class="row align-items-center g-3">
-                    <div class="col-auto">
-                        <?php
-                        $nama_member = trim($m['nama'] ?? '');
-                        if (empty($nama_member) || $nama_member == 'Member BOSSCUAN') {
-                            $inisial = 'MB';
-                        } else {
-                            $pecah = explode(' ', $nama_member);
-                            if (count($pecah) > 1) {
-                                $inisial = strtoupper(substr($pecah[0], 0, 1) . substr($pecah[1], 0, 1));
+                <div class="row align-items-start align-items-md-center g-3">
+
+                    <div class="col-md col-12 d-flex align-items-start align-items-md-center">
+
+                        <div class="fw-bold text-muted text-end me-2 me-md-3 mt-1 mt-md-0">
+                            <?= $no++ ?>.
+                        </div>
+
+                        <div class="me-3">
+                            <?php
+                            $nama_member = trim($m['nama'] ?? '');
+                            if (empty($nama_member) || $nama_member == 'Member BOSSCUAN') {
+                                $inisial = 'MB';
                             } else {
-                                $inisial = strtoupper(substr($nama_member, 0, 2));
+                                $pecah = explode(' ', $nama_member);
+                                if (count($pecah) > 1) {
+                                    $inisial = strtoupper(substr($pecah[0], 0, 1) . substr($pecah[1], 0, 1));
+                                } else {
+                                    $inisial = strtoupper(substr($nama_member, 0, 2));
+                                }
                             }
-                        }
-                        ?>
-                        <div class="avatar-sub"><?= $inisial ?></div>
-                    </div>
-                    <div class="col-md-3 col-12">
-                        <h6 class="fw-bold mb-0 text-dark" id="nama-<?= $m['id_hfm'] ?>">
-                            <?= isset($m['nama']) && !empty($m['nama']) ? esc($m['nama']) : 'Member BOSSCUAN' ?>
-                        </h6>
-                        <div class="text-muted small mt-1">
-                            <div><i class="bi bi-hash text-primary"></i> <?= esc($m['id_hfm']) ?></div>
-                            <div>
-                                <i class="bi bi-whatsapp text-success"></i> <?= esc($m['no_wa']) ?> &bull;
-                                <i class="bi bi-telegram text-info"></i> <?= esc($m['id_telegram'] ?? '-') ?>
+                            ?>
+                            <div class="avatar-sub"><?= $inisial ?></div>
+                        </div>
+
+                        <div class="flex-grow-1">
+                            <h6 class="fw-bold mb-0 text-dark" id="nama-<?= $m['id_hfm'] ?>">
+                                <?= isset($m['nama']) && !empty($m['nama']) ? esc($m['nama']) : 'Member BOSSCUAN' ?>
+                            </h6>
+                            <div class="text-muted small mt-1 d-flex flex-column gap-1">
+                                <div><i class="bi bi-hash text-primary"></i> <?= esc($m['id_hfm']) ?></div>
+                                <div><i class="bi bi-whatsapp text-success"></i> <?= esc($m['no_wa']) ?></div>
+                                <div><i class="bi bi-telegram text-info"></i> <?= esc($m['id_telegram'] ?? '-') ?></div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-2 col-4">
+
+                    <div class="col-6 col-md-2">
                         <p class="text-muted small mb-0">Deposit</p>
                         <span class="fw-bold text-dark" id="depo-<?= $m['id_hfm'] ?>">
                             <?= esc($m['currency'] ?? 'USD') ?> <?= number_format($m['deposit'], 2) ?>
                         </span>
                     </div>
-                    <div class="col-md-2 col-4">
+
+                    <div class="col-6 col-md-2">
                         <p class="text-muted small mb-0">Terakhir Trading</p>
-                        <span id="trade-<?= $m['id_hfm'] ?>">
+                        <span id="trade-<?= $m['id_hfm'] ?>" class="d-inline-block mt-1">
                             <?php if (empty($m['last_trade']) || $m['last_trade'] === '0000-00-00 00:00:00'): ?>
                                 <span class="badge bg-light border text-muted rounded-pill small">Belum Trading</span>
                             <?php else: ?>
@@ -148,9 +158,10 @@
                             <?php endif; ?>
                         </span>
                     </div>
-                    <div class="col-md-1 col-4">
+
+                    <div class="col-12 col-md-2 mt-3 mt-md-0 text-center text-md-start">
                         <p class="text-muted small mb-0">Status IB</p>
-                        <span id="status-<?= $m['id_hfm'] ?>">
+                        <span id="status-<?= $m['id_hfm'] ?>" class="d-inline-block mt-1">
                             <?php if ($m['status'] == 'aktif'): ?>
                                 <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2 small fw-semibold">Aktif</span>
                             <?php else: ?>
@@ -158,7 +169,8 @@
                             <?php endif; ?>
                         </span>
                     </div>
-                    <div class="col-md-3 col-12 d-flex justify-content-md-end justify-content-start align-items-center flex-wrap gap-2 mt-3 mt-md-0">
+
+                    <div class="col-12 col-md-auto d-flex justify-content-center justify-content-md-end align-items-center flex-wrap gap-2 mt-3 mt-md-0">
                         <button class="btn btn-outline-warning btn-sm rounded-pill px-3 fw-semibold btn-edit"
                             data-id="<?= esc($m['id_hfm']) ?>"
                             data-wa="<?= esc($m['no_wa']) ?>"
@@ -648,9 +660,8 @@
 
                             const waTextEl = row.querySelector('.text-muted.small.mt-1 div:nth-child(2)');
                             if (waTextEl) {
-                                const telegramIconNode = waTextEl.querySelector('.bi-telegram');
-                                const currentTelegramText = telegramIconNode ? telegramIconNode.parentNode.textContent.trim() : '-';
-                                waTextEl.innerHTML = `<i class="bi bi-whatsapp text-success"></i> ${noWaVal} &bull; <i class="bi bi-telegram text-info"></i> ${currentTelegramText}`;
+                                // Karena sekarang WA dan Telegram beda baris (div), kita hanya update teks WA-nya saja
+                                waTextEl.innerHTML = `<i class="bi bi-whatsapp text-success"></i> ${noWaVal}`;
                             }
 
                             const btnEditElement = row.querySelector('.btn-edit');
@@ -738,7 +749,10 @@
     });
 
     async function restartBot() {
-        if (!await showAppConfirm('Yakin ingin merestart bot WhatsApp?', {title: 'Restart bot WhatsApp', confirmText: 'Restart sekarang'})) return;
+        if (!await showAppConfirm('Yakin ingin merestart bot WhatsApp?', {
+                title: 'Restart bot WhatsApp',
+                confirmText: 'Restart sekarang'
+            })) return;
         fetch('http://103.89.4.144:3000/api/restart-bot', {
                 method: 'POST',
                 headers: {
@@ -757,7 +771,11 @@
     }
 
     async function resetSesi() {
-        if (!await showAppConfirm('HATI-HATI!\nIni akan MENGHAPUS sesi WhatsApp bot.\nLanjutkan?', {title: 'Reset sesi WhatsApp', confirmText: 'Ya, reset sesi', danger: true})) return;
+        if (!await showAppConfirm('HATI-HATI!\nIni akan MENGHAPUS sesi WhatsApp bot.\nLanjutkan?', {
+                title: 'Reset sesi WhatsApp',
+                confirmText: 'Ya, reset sesi',
+                danger: true
+            })) return;
         fetch('http://103.89.4.144:3000/api/reset-sesi', {
                 method: 'POST',
                 headers: {
