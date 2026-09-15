@@ -1,109 +1,93 @@
 <?= $this->extend('layout/template') ?>
-
 <?= $this->section('content') ?>
-<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
-    <div>
-        <h3 class="fw-bold tracking-tight mb-1">Performa Kampanye (API)</h3>
-        <p class="text-muted small">Data performa link IB dari sistem HFM secara realtime.</p>
-        <?php if (isset($total_campaigns)): ?>
-            <span class="badge bg-primary">Total: <?= $total_campaigns ?> Campaign</span>
-        <?php endif; ?>
+
+<div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mt-2 mb-4">
+
+    <!-- Header -->
+    <div class="row align-items-md-center justify-content-between mb-4 g-3">
+        <div class="col-12 col-md">
+            <h4 class="fw-bold tracking-tight text-primary mb-1">
+                <i class="bi bi-megaphone me-2"></i><?= esc($title) ?>
+            </h4>
+            <p class="text-muted small mb-0">Daftar kampanye (Campaign) afiliasi yang terdaftar di akun HFM Anda.</p>
+        </div>
+        <div class="col-12 col-md-auto">
+            <a href="<?= base_url('AdminDashboard/campaigns') ?>" class="btn btn-outline-primary rounded-pill px-4 py-2 small fw-semibold shadow-sm w-100">
+                <i class="bi bi-arrow-clockwise me-1"></i> Segarkan Data
+            </a>
+        </div>
     </div>
-    <button class="btn btn-primary rounded-pill px-4 shadow-sm" onclick="location.reload()">
-        <i class="bi bi-arrow-clockwise me-1"></i> Refresh Data
-    </button>
-</div>
 
-<?php if (isset($debug_api) && $debug_api): ?>
-    <div class="alert alert-warning">
-        <strong><i class="bi bi-exclamation-triangle me-1"></i> Debug:</strong> <?= esc($debug_api) ?>
-    </div>
-<?php endif; ?>
+    <!-- Notifikasi Error API -->
+    <?php if ($debug_api): ?>
+        <div class="alert alert-warning small py-2 rounded-3 shadow-sm"><i class="bi bi-exclamation-triangle me-2"></i><?= esc($debug_api) ?></div>
+    <?php endif; ?>
 
-<?php if (isset($http_code) && $http_code !== 200): ?>
-    <div class="alert alert-danger">
-        <strong>HTTP Status:</strong> <?= $http_code ?>
-    </div>
-<?php endif; ?>
-
-<?php if (isset($raw_response) && $raw_response && empty($campaigns)): ?>
-    <div class="alert alert-info">
-        <strong>Raw Response (first 500 chars):</strong>
-        <pre class="small" style="max-height:200px; overflow:auto;"><?= esc(substr($raw_response, 0, 500)) ?></pre>
-    </div>
-<?php endif; ?>
-
-<div class="row g-4">
-    <?php if (!empty($campaigns) && is_array($campaigns)): ?>
-        <?php foreach ($campaigns as $camp): ?>
-            <div class="col-md-6 col-xl-4">
-                <div class="card data-card p-4 h-100 border-top border-primary border-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 80%;" title="<?= esc($camp['name'] ?? 'Unnamed') ?>">
-                            <i class="bi bi-megaphone-fill text-primary me-2"></i><?= esc($camp['name'] ?? 'Unnamed Campaign') ?>
-                        </h6>
-                        <span class="badge bg-light text-dark border small"><?= esc($camp['type'] ?? 'Standard') ?></span>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <p class="text-muted small mb-0"><i class="bi bi-cursor text-secondary me-1"></i> Total Klik</p>
-                            <h5 class="fw-bold mb-0"><?= number_format($camp['clicks'] ?? 0) ?></h5>
-                        </div>
-                        <div class="col-6">
-                            <p class="text-muted small mb-0"><i class="bi bi-people text-secondary me-1"></i> Total Akun</p>
-                            <h5 class="fw-bold mb-0"><?= number_format($camp['total_trading_account_registrations'] ?? 0) ?></h5>
-                        </div>
-                        <div class="col-6">
-                            <p class="text-muted small mb-0"><i class="bi bi-person-check text-success me-1"></i> Akun Aktif</p>
-                            <h5 class="fw-bold text-success mb-0"><?= number_format($camp['active_trading_account_registrations'] ?? 0) ?></h5>
-                        </div>
-                        <div class="col-6">
-                            <p class="text-muted small mb-0"><i class="bi bi-cash-coin text-warning me-1"></i> Komisi ($)</p>
-                            <h5 class="fw-bold text-dark mb-0">$<?= number_format($camp['commission'] ?? 0, 2) ?></h5>
-                        </div>
-                    </div>
-
-                    <?php if (!empty($camp['main_link'])): ?>
-                        <div class="mt-4 pt-3 border-top">
-                            <p class="small text-muted mb-1 fw-semibold">Link Referal:</p>
-                            <div class="input-group input-group-sm">
-                                <input type="text" class="form-control bg-light text-muted" value="<?= esc($camp['main_link']) ?>" readonly id="link-<?= $camp['name'] ?>">
-                                <button class="btn btn-outline-secondary" type="button" onclick="salinLink('link-<?= $camp['name'] ?>')">
-                                    <i class="bi bi-clipboard"></i> Salin
-                                </button>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+    <!-- Summary Card -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-3">
+            <div class="p-3 bg-white border rounded-4 shadow-sm d-flex align-items-center">
+                <div class="bg-primary-subtle text-primary rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 48px; height: 48px;">
+                    <i class="bi bi-collection fs-4"></i>
+                </div>
+                <div>
+                    <small class="text-muted d-block fw-semibold">Total Campaign</small>
+                    <span class="fw-bold fs-4"><?= count($campaigns) ?></span>
                 </div>
             </div>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <div class="col-12">
-            <div class="card p-5 text-center border-dashed bg-light rounded-4">
-                <i class="bi bi-inbox text-muted fs-1 mb-3"></i>
-                <h5 class="fw-bold text-secondary">Tidak ada data Kampanye</h5>
-                <p class="text-muted small mb-0">Pastikan API Key benar, HFM tidak gangguan, atau Anda memang belum membuat kampanye.</p>
-            </div>
         </div>
-    <?php endif; ?>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-responsive border-0 overflow-hidden shadow-sm rounded-4">
+        <table class="table table-hover align-middle table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="px-3 py-3 border-bottom-0" style="width: 60px;">No</th>
+                    <th class="py-3 border-bottom-0">Nama Kampanye (Campaign Name)</th>
+                    <th class="py-3 border-bottom-0 text-center">Campaign ID</th>
+                    <th class="py-3 border-bottom-0 text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white">
+                <?php if (empty($campaigns)): ?>
+                    <tr>
+                        <td colspan="4" class="text-center py-5">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                <h6 class="fw-bold mt-3">Belum ada Kampanye</h6>
+                                <p class="text-muted small">Tidak ada data kampanye yang ditemukan dari API HFM.</p>
+                            </div>
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php $no = 1;
+                    foreach ($campaigns as $camp): ?>
+                        <tr>
+                            <td class="px-3 fw-semibold text-muted text-center"><?= $no++ ?></td>
+                            <td class="fw-bold text-dark py-3" style="font-size: 0.95rem;">
+                                <?= esc($camp['name'] ?? 'Unnamed Campaign') ?>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-light text-primary border border-primary-subtle px-3 py-2 fs-7 rounded-pill">
+                                    <?= esc($camp['id'] ?? $camp['campaign_id'] ?? '-') ?>
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <?php
+                                $status = strtolower($camp['status'] ?? 'active');
+                                $badgeClass = ($status === 'active') ? 'bg-success' : 'bg-secondary';
+                                ?>
+                                <span class="badge <?= $badgeClass ?> rounded-pill px-3 py-1">
+                                    <?= esc(ucfirst($status)) ?>
+                                </span>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
-<?= $this->endSection() ?>
 
-<?= $this->section('scripts') ?>
-<script>
-    const APP_ROUTES = {
-        hapusMember: "<?= base_url('AdminDashboard/hapus-member/') ?>",
-        syncHfm: "<?= base_url('AdminDashboard/syncHfm/') ?>"
-    };
-
-    function salinLink(inputId) {
-        var copyText = document.getElementById(inputId);
-        copyText.select();
-        copyText.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(copyText.value).then(() => {
-            alert("Link berhasil disalin!");
-        });
-    }
-</script>
 <?= $this->endSection() ?>

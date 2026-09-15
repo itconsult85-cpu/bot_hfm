@@ -47,9 +47,15 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     // ROUTE HAPUS MEMBER
     $routes->get('AdminDashboard/hapus-member/(:any)', 'AdminDashboard::hapusMember/$1');
 
-    $routes->get('AdminDashboard/campaigns', 'AdminDashboard::campaigns');
+    $routes->get('AdminDashboard/mycampaigns', 'AdminDashboard::mycampaigns');
     $routes->get('AdminDashboard/campaign-wallets', 'AdminDashboard::campaignWallets');
     $routes->get('AdminDashboard/campaign-wallets/(:any)', 'AdminDashboard::campaignWallets/$1');
+    $routes->get('AdminDashboard/clientPerformance', 'AdminDashboard::clientPerformance');
+    $routes->get('AdminDashboard/overallPerformance', 'AdminDashboard::overallPerformance');
+    $routes->get('AdminDashboard/clientTrades', 'AdminDashboard::clientTrades');
+    $routes->get('AdminDashboard/campaignTrades', 'AdminDashboard::campaignTrades');
+    $routes->get('AdminDashboard/campaigns', 'AdminDashboard::campaigns');
+    $routes->get('AdminDashboard/campaignRawClicks', 'AdminDashboard::campaignRawClicks');
 
     $routes->get('admin/member-logs', 'AdminDashboard::memberLogs');
     $routes->get('AdminDashboard/memberLogs', 'AdminDashboard::memberLogs');

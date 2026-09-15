@@ -216,9 +216,437 @@ class AdminDashboard extends BaseController
     }
 
     // ==========================================
-    // HALAMAN CAMPAIGN (KAMPANYE)
+    // HALAMAN OVERALL PERFORMANCE
+    // ==========================================
+    public function overallPerformance()
+    {
+        // 1. Tangkap parameter dari form filter (default 1 bulan terakhir)
+        $data = [
+            'title'     => 'Overall Performance',
+            'date_from' => $this->request->getGet('from_date') ?? date('Y-m-01'),
+            'date_to'   => $this->request->getGet('to_date') ?? date('Y-m-d'),
+            'group_by'  => $this->request->getGet('group_by') ?? 'day',
+            'performance_data' => [],
+            'totals'    => [],
+            'debug_api' => null
+        ];
+
+        // 2. Susun parameter URL
+        $queryParams = [
+            'from_date' => $data['date_from'],
+            'to_date'   => $data['date_to'],
+            'group_by'  => $data['group_by']
+        ];
+        $url = $this->baseUrl . "/performance/overall-performance?" . http_build_query($queryParams);
+
+        // 3. Eksekusi API via cURL
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $this->apiKey,
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // 4. Proses response API
+        if ($err) {
+            $data['debug_api'] = "CURL Error: " . $err;
+        } elseif ($response && $httpCode === 200) {
+            $apiData = json_decode($response, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                // Ambil data sesuai skema API HFM
+                $data['totals'] = $apiData['totals'] ?? [];
+                $data['performance_data'] = $apiData['overall_performance'] ?? [];
+            } else {
+                $data['debug_api'] = "JSON Error: " . json_last_error_msg();
+            }
+        } elseif ($httpCode === 422) {
+            $data['debug_api'] = "Validation Error (422). Format tanggal tidak valid.";
+        } else {
+            $data['debug_api'] = "Gagal memuat API HFM (HTTP: $httpCode).";
+        }
+
+        // 5. Lempar data ke View
+        return view('admin_overall_performance', $data);
+    }
+
+    // ==========================================
+    // HALAMAN CLIENT PERFORMANCE (PRODUCTION)
+    // ==========================================
+    public function clientPerformance()
+    {
+        // 1. Naikkan memori limit untuk mencegah OOM saat parsing 50MB JSON
+        ini_set('memory_limit', '1024M');
+
+        $data = [
+            'title' => 'Client Performance',
+            'date_from' => $this->request->getGet('from_date') ?? date('Y-m-01'),
+            'date_to' => $this->request->getGet('to_date') ?? date('Y-m-d'),
+            'activity_status' => $this->request->getGet('activity_status') ?? '',
+            'platform' => $this->request->getGet('platform') ?? '',
+            'clients' => [],
+            'totals' => [],
+            'debug_api' => null,
+            'total_semua_klien' => 0
+        ];
+
+        // Build URL
+        $url = $this->baseUrl . "/performance/client-performance?";
+        $params = [];
+        if (!empty($data['date_from'])) $params[] = "from_date=" . urlencode($data['date_from']);
+        if (!empty($data['date_to'])) $params[] = "to_date=" . urlencode($data['date_to']);
+        if (!empty($data['activity_status'])) $params[] = "activity_status=" . urlencode($data['activity_status']);
+        if (!empty($data['platform'])) $params[] = "platforms[]=" . urlencode($data['platform']);
+        $url .= implode('&', $params);
+
+        // Eksekusi API
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $this->apiKey,
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // Waktu tunggu 60 detik
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($err) {
+            $data['debug_api'] = "CURL Error: " . $err;
+        } elseif ($response && $httpCode === 200) {
+            $apiData = json_decode($response, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                // Ambil summary totals
+                $data['totals'] = $apiData['totals'] ?? [];
+
+                // ANTI BROWSER CRASH: Kita hanya mem-passing maksimal 500 baris ke View HTML
+                if (isset($apiData['clients']) && is_array($apiData['clients'])) {
+                    $data['total_semua_klien'] = count($apiData['clients']);
+                    $data['clients'] = array_slice($apiData['clients'], 0, 500);
+                }
+
+                // KOSONGKAN MEMORI RAM
+                unset($apiData);
+                unset($response);
+            } else {
+                $data['debug_api'] = "JSON Error: " . json_last_error_msg();
+            }
+        } else {
+            $data['debug_api'] = "Gagal memuat API HFM (HTTP: $httpCode).";
+        }
+
+        return view('admin_client_performance', $data);
+    }
+
+    // ==========================================
+    // HALAMAN CLIENT TRADES
+    // ==========================================
+    public function clientTrades()
+    {
+        // Naikkan batas memori karena data trades biasanya sangat masif
+        ini_set('memory_limit', '1024M');
+
+        // Set default rentang waktu hanya 1 HARI TERAKHIR untuk mencegah Error 413 dari HFM
+        $data = [
+            'title' => 'Client Trades',
+            'date_from' => $this->request->getGet('from_date') ?? date('Y-m-d', strtotime('-1 days')),
+            'date_to' => $this->request->getGet('to_date') ?? date('Y-m-d'),
+            'platform' => $this->request->getGet('platform') ?? '',
+            'trades' => [],
+            'totals' => [],
+            'debug_api' => null,
+            'total_semua_trade' => 0
+        ];
+
+        // Build URL Parameter
+        $url = $this->baseUrl . "/client-trades/?";
+        $params = [];
+        if (!empty($data['date_from'])) $params[] = "from_date=" . urlencode($data['date_from']);
+        if (!empty($data['date_to'])) $params[] = "to_date=" . urlencode($data['date_to']);
+        if (!empty($data['platform'])) $params[] = "platforms[]=" . urlencode($data['platform']);
+        $url .= implode('&', $params);
+
+        // Eksekusi cURL
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $this->apiKey,
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // Proses Response
+        if ($err) {
+            $data['debug_api'] = "CURL Error: " . $err;
+        } elseif ($httpCode === 413) {
+            // Penanganan khusus Error 413 sesuai dokumentasi HFM
+            $data['debug_api'] = "Data terlalu besar untuk diproses API HFM. Harap persingkat rentang tanggal pencarian Anda (misal: cari per 1 hari saja).";
+        } elseif ($response && $httpCode === 200) {
+            $apiData = json_decode($response, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $data['totals'] = $apiData['totals'] ?? [];
+
+                // Ambil maksimal 500 data untuk dirender ke View agar browser tidak hang
+                if (isset($apiData['trades']) && is_array($apiData['trades'])) {
+                    $data['total_semua_trade'] = count($apiData['trades']);
+                    $data['trades'] = array_slice($apiData['trades'], 0, 500);
+                }
+
+                unset($apiData);
+                unset($response);
+            } else {
+                $data['debug_api'] = "JSON Error: " . json_last_error_msg();
+            }
+        } elseif ($httpCode === 422) {
+            $data['debug_api'] = "Validation Error (422). Format input tidak valid.";
+        } else {
+            $data['debug_api'] = "Gagal memuat API HFM (HTTP: $httpCode).";
+        }
+
+        return view('admin_client_trades', $data);
+    }
+
+    // ==========================================
+    // HALAMAN COMMISSION GENERATED (CAMPAIGN TRADES)
+    // ==========================================
+    public function campaignTrades()
+    {
+        // Naikkan batas memori karena data transaksi bisa sangat besar
+        ini_set('memory_limit', '1024M');
+
+        $data = [
+            'title' => 'Commission Generated',
+            // Default 7 hari terakhir agar data tidak terlalu raksasa
+            'date_from' => $this->request->getGet('date_from') ?? date('Y-m-d', strtotime('-7 days')),
+            'date_to' => $this->request->getGet('date_to') ?? date('Y-m-d'),
+            'selected_campaign' => $this->request->getGet('campaign_ids') ?? '',
+            'trades' => [],
+            'debug_api' => null,
+            'total_semua_trade' => 0,
+            // Mengambil daftar campaign dari helper yang sudah ada di file ini
+            'campaigns' => $this->getCampaignList()
+        ];
+
+        // Build URL Parameter
+        $url = $this->baseUrl . "/campaigns/trades?";
+        $params = [];
+        if (!empty($data['date_from'])) $params[] = "date_from=" . urlencode($data['date_from']);
+        if (!empty($data['date_to'])) $params[] = "date_to=" . urlencode($data['date_to']);
+        if (!empty($data['selected_campaign'])) $params[] = "campaign_ids=" . urlencode($data['selected_campaign']);
+
+        $url .= implode('&', $params);
+
+        // Eksekusi cURL
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $this->apiKey,
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // Proses Response
+        if ($err) {
+            $data['debug_api'] = "CURL Error: " . $err;
+        } elseif ($httpCode === 413) {
+            $data['debug_api'] = "Data terlalu besar untuk diproses API HFM. Harap persingkat rentang tanggal pencarian Anda.";
+        } elseif ($response && $httpCode === 200) {
+            $apiData = json_decode($response, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                // Endpoint ini mengembalikan array transaksi di dalam key "data"
+                if (isset($apiData['data']) && is_array($apiData['data'])) {
+                    $data['total_semua_trade'] = count($apiData['data']);
+                    // Ambil maksimal 500 data untuk dirender ke View agar browser tidak hang
+                    $data['trades'] = array_slice($apiData['data'], 0, 500);
+                }
+
+                unset($apiData);
+                unset($response);
+            } else {
+                $data['debug_api'] = "JSON Error: " . json_last_error_msg();
+            }
+        } elseif ($httpCode === 422) {
+            $data['debug_api'] = "Validation Error (422). Format tanggal tidak valid.";
+        } else {
+            $data['debug_api'] = "Gagal memuat API HFM (HTTP: $httpCode).";
+        }
+
+        return view('admin_campaign_trades', $data);
+    }
+
+    // ==========================================
+    // HALAMAN MY CAMPAIGNS
     // ==========================================
     public function campaigns()
+    {
+        $data = [
+            'title' => 'My Campaigns',
+            'campaigns' => [],
+            'debug_api' => null
+        ];
+
+        // Endpoint sesuai dokumentasi terbaru
+        $url = $this->baseUrl . "/campaigns/";
+
+        // Eksekusi cURL
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $this->apiKey,
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // Proses Response
+        if ($err) {
+            $data['debug_api'] = "CURL Error: " . $err;
+        } elseif ($response && $httpCode === 200) {
+            $apiData = json_decode($response, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                // Menangkap data dari skema { "data": [] } atau fallback ke array langsung
+                if (isset($apiData['data']) && is_array($apiData['data'])) {
+                    $data['campaigns'] = $apiData['data'];
+                } elseif (is_array($apiData)) {
+                    $data['campaigns'] = $apiData;
+                }
+            } else {
+                $data['debug_api'] = "JSON Error: " . json_last_error_msg();
+            }
+        } else {
+            $data['debug_api'] = "Gagal memuat API HFM (HTTP: $httpCode).";
+        }
+
+        return view('admin_campaigns', $data);
+    }
+
+    // ==========================================
+    // HALAMAN RAW CLICKS (KLIK KAMPANYE)
+    // ==========================================
+    public function campaignRawClicks()
+    {
+        // Naikkan batas memori karena data klik bisa sangat masif
+        ini_set('memory_limit', '1024M');
+
+        $data = [
+            'title' => 'Raw Clicks (Klik Kampanye)',
+            // Default 7 hari terakhir
+            'date_from' => $this->request->getGet('date_from') ?? date('Y-m-d', strtotime('-7 days')),
+            'date_to' => $this->request->getGet('date_to') ?? date('Y-m-d'),
+            'selected_campaign' => $this->request->getGet('campaign_ids') ?? '',
+            'clicks' => [],
+            'debug_api' => null,
+            'total_semua_klik' => 0,
+            // Mengambil daftar campaign dari helper yang sudah ada
+            'campaigns' => $this->getCampaignList()
+        ];
+
+        // Build URL Parameter
+        $url = $this->baseUrl . "/campaigns/raw-clicks?";
+        $params = [];
+        if (!empty($data['date_from'])) $params[] = "date_from=" . urlencode($data['date_from']);
+        if (!empty($data['date_to'])) $params[] = "date_to=" . urlencode($data['date_to']);
+        if (!empty($data['selected_campaign'])) $params[] = "campaign_ids=" . urlencode($data['selected_campaign']);
+
+        $url .= implode('&', $params);
+
+        // Eksekusi cURL
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $this->apiKey,
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // Proses Response
+        if ($err) {
+            $data['debug_api'] = "CURL Error: " . $err;
+        } elseif ($httpCode === 413) {
+            $data['debug_api'] = "Data terlalu besar untuk diproses API HFM. Harap persingkat rentang tanggal pencarian Anda.";
+        } elseif ($response && $httpCode === 200) {
+            $apiData = json_decode($response, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                if (isset($apiData['data']) && is_array($apiData['data'])) {
+                    $data['total_semua_klik'] = count($apiData['data']);
+                    // Batasi data yang dirender ke tabel untuk mencegah browser freeze
+                    $data['clicks'] = array_slice($apiData['data'], 0, 500);
+                }
+
+                unset($apiData);
+                unset($response);
+            } else {
+                $data['debug_api'] = "JSON Error: " . json_last_error_msg();
+            }
+        } elseif ($httpCode === 422) {
+            $data['debug_api'] = "Validation Error (422). Format tanggal tidak valid.";
+        } else {
+            $data['debug_api'] = "Gagal memuat API HFM (HTTP: $httpCode).";
+        }
+
+        return view('admin_campaign_raw_clicks', $data);
+    }
+
+    // ==========================================
+    // HALAMAN CAMPAIGN (KAMPANYE)
+    // ==========================================
+    public function mycampaigns()
     {
         $data['campaigns'] = [];
         $data['debug_api'] = null;
@@ -270,7 +698,7 @@ class AdminDashboard extends BaseController
             $data['debug_api'] = "Tidak ada response dari API";
         }
 
-        return view('admin_campaigns', $data);
+        return view('admin_mycampaigns', $data);
     }
 
     // ==========================================
