@@ -78,7 +78,6 @@
                             </td>
 
                             <td class="text-center px-1 px-md-2">
-                                Gunakan d-inline-flex, rounded standar untuk mobile, dan rounded-md-pill untuk desktop -->
                                 <button type="button" class="btn btn-sm btn-outline-danger rounded rounded-md-pill p-1 px-md-3 py-md-1 btn-kick-member d-inline-flex align-items-center justify-content-center"
                                     data-id="<?= (int) $member['id'] ?>"
                                     data-nama="<?= esc($member['nama'] ?: 'Member Tanpa Nama') ?>"
