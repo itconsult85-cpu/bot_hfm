@@ -57,6 +57,10 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->get('AdminDashboard/campaigns', 'AdminDashboard::campaigns');
     $routes->get('AdminDashboard/campaignRawClicks', 'AdminDashboard::campaignRawClicks');
 
+    // Modifikasi ACID code wallet via API HFM
+    $routes->get('client-acid-code-modification', 'ClientAcidCodeModification::index');
+    $routes->post('client-acid-code-modification/modify', 'ClientAcidCodeModification::modify');
+
     $routes->get('admin/member-logs', 'AdminDashboard::memberLogs');
     $routes->get('AdminDashboard/memberLogs', 'AdminDashboard::memberLogs');
 

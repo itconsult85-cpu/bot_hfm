@@ -18,7 +18,8 @@
         strpos($uri, 'AdminDashboard/campaigns') === 0 ||
         strpos($uri, 'AdminDashboard/campaignWallets') === 0 ||
         strpos($uri, 'AdminDashboard/campaignTrades') === 0 ||
-        strpos($uri, 'AdminDashboard/campaignRawClicks') === 0;
+        strpos($uri, 'AdminDashboard/campaignRawClicks') === 0 ||
+        strpos($uri, 'client-acid-code-modification') === 0;
     ?>
 
     <div class="offcanvas-body p-0 py-3 overflow-y-auto">
@@ -58,6 +59,7 @@
                 <a href="<?= base_url('AdminDashboard/campaign-wallets') ?>" class="submenu-link <?= (strpos($uri, 'AdminDashboard/campaign-wallets') === 0) ? 'active' : '' ?>">Wallet Registrations</a>
                 <a href="<?= base_url('AdminDashboard/campaignTrades') ?>" class="submenu-link <?= (strpos($uri, 'AdminDashboard/campaignTrades') === 0) ? 'active' : '' ?>">Komisi Kampanye (Trades)</a>
                 <a href="<?= base_url('AdminDashboard/campaignRawClicks') ?>" class="submenu-link <?= (strpos($uri, 'AdminDashboard/campaignRawClicks') === 0) ? 'active' : '' ?>">Klik Kampanye (Raw Clicks)</a>
+                <a href="<?= base_url('client-acid-code-modification') ?>" class="submenu-link <?= (strpos($uri, 'client-acid-code-modification') === 0) ? 'active' : '' ?>">Modifikasi ACID Wallet</a>
             </div>
         </div>
 
