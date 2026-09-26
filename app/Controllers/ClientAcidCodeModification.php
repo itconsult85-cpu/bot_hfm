@@ -11,40 +11,67 @@ class ClientAcidCodeModification extends BaseController
 
     public function index()
     {
-        $members = Database::connect()->table('tb_member_vip')
-            ->select('id_hfm, nama, email, status, currency')
-            ->where('id_hfm IS NOT NULL', null, false)
-            ->where('id_hfm !=', '')
-            ->orderBy('nama', 'ASC')
-            ->get()
-            ->getResultArray();
-
         return view('client_acid_code_modification', [
             'title' => 'Modifikasi ACID Code Wallet',
-            'members' => $members,
+            'members' => $this->members(),
             'oldWalletId' => (string) ($this->request->getGet('client_wallet_id') ?? ''),
         ]);
     }
 
     public function modify()
     {
-        $walletId = trim((string) $this->request->getPost('client_wallet_id'));
+        return $this->sendModification('wallet', 'client_wallet_id', 'client-acid-code-modification', 'Client wallet ID');
+    }
+
+    public function tradingAccount()
+    {
+        return view('client_acid_code_modification_trading_account', [
+            'title' => 'Modifikasi ACID Code Trading Account',
+            'members' => $this->members(),
+            'oldTradingAccountId' => (string) ($this->request->getGet('client_trading_account_id') ?? ''),
+        ]);
+    }
+
+    public function modifyTradingAccount()
+    {
+        return $this->sendModification(
+            'trading-account',
+            'client_trading_account_id',
+            'client-acid-code-modification/trading-account',
+            'Client trading account ID'
+        );
+    }
+
+    private function members(): array
+    {
+        return Database::connect()->table('tb_member_vip')
+            ->select('id_hfm, nama, email, status, currency')
+            ->where('id_hfm IS NOT NULL', null, false)
+            ->where('id_hfm !=', '')
+            ->orderBy('nama', 'ASC')
+            ->get()
+            ->getResultArray();
+    }
+
+    private function sendModification(string $accountType, string $idField, string $redirectPath, string $idLabel)
+    {
+        $accountId = trim((string) $this->request->getPost($idField));
         $acid = trim((string) $this->request->getPost('acid'));
 
-        if (! preg_match('/^[1-9][0-9]*$/', $walletId)) {
-            return redirect()->to(base_url('client-acid-code-modification'))
+        if (! preg_match('/^[1-9][0-9]*$/', $accountId)) {
+            return redirect()->to(base_url($redirectPath))
                 ->withInput()
-                ->with('error', 'Client wallet ID wajib berupa angka positif.');
+                ->with('error', $idLabel . ' wajib berupa angka positif.');
         }
 
         if ($acid === '' || strlen($acid) > 100) {
-            return redirect()->to(base_url('client-acid-code-modification'))
+            return redirect()->to(base_url($redirectPath))
                 ->withInput()
                 ->with('error', 'ACID wajib diisi dan maksimal 100 karakter.');
         }
 
-        $url = $this->baseUrl . '/client-acid-code-modification/wallet/'
-            . rawurlencode($walletId) . '?' . http_build_query(['acid' => $acid]);
+        $url = $this->baseUrl . '/client-acid-code-modification/' . $accountType . '/'
+            . rawurlencode($accountId) . '?' . http_build_query(['acid' => $acid]);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -68,7 +95,7 @@ class ClientAcidCodeModification extends BaseController
         curl_close($ch);
 
         if ($curlError !== '') {
-            return redirect()->to(base_url('client-acid-code-modification'))
+            return redirect()->to(base_url($redirectPath))
                 ->withInput()
                 ->with('error', 'Gagal terhubung ke API HFM: ' . $curlError);
         }
@@ -77,14 +104,14 @@ class ClientAcidCodeModification extends BaseController
         if ($httpCode === 200) {
             $message = is_string($response)
                 ? $response
-                : (string) ($response['message'] ?? $response['detail'] ?? 'ACID code wallet berhasil dimodifikasi.');
+                : (string) ($response['message'] ?? $response['detail'] ?? 'ACID code berhasil dimodifikasi.');
 
-            return redirect()->to(base_url('client-acid-code-modification'))
+            return redirect()->to(base_url($redirectPath))
                 ->with('success', $message);
         }
 
         $message = $this->formatApiError($response, $rawResponse, $httpCode);
-        return redirect()->to(base_url('client-acid-code-modification'))
+        return redirect()->to(base_url($redirectPath))
             ->withInput()
             ->with('error', $message);
     }

@@ -60,6 +60,7 @@
                 <a href="<?= base_url('AdminDashboard/campaignTrades') ?>" class="submenu-link <?= (strpos($uri, 'AdminDashboard/campaignTrades') === 0) ? 'active' : '' ?>">Komisi Kampanye (Trades)</a>
                 <a href="<?= base_url('AdminDashboard/campaignRawClicks') ?>" class="submenu-link <?= (strpos($uri, 'AdminDashboard/campaignRawClicks') === 0) ? 'active' : '' ?>">Klik Kampanye (Raw Clicks)</a>
                 <a href="<?= base_url('client-acid-code-modification') ?>" class="submenu-link <?= (strpos($uri, 'client-acid-code-modification') === 0) ? 'active' : '' ?>">Modifikasi ACID Wallet</a>
+                <a href="<?= base_url('client-acid-code-modification/trading-account') ?>" class="submenu-link <?= (strpos($uri, 'client-acid-code-modification/trading-account') === 0) ? 'active' : '' ?>">Modifikasi ACID Trading Account</a>
             </div>
         </div>
 

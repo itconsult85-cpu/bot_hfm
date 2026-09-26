@@ -60,6 +60,8 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     // Modifikasi ACID code wallet via API HFM
     $routes->get('client-acid-code-modification', 'ClientAcidCodeModification::index');
     $routes->post('client-acid-code-modification/modify', 'ClientAcidCodeModification::modify');
+    $routes->get('client-acid-code-modification/trading-account', 'ClientAcidCodeModification::tradingAccount');
+    $routes->post('client-acid-code-modification/trading-account/modify', 'ClientAcidCodeModification::modifyTradingAccount');
 
     $routes->get('admin/member-logs', 'AdminDashboard::memberLogs');
     $routes->get('AdminDashboard/memberLogs', 'AdminDashboard::memberLogs');
