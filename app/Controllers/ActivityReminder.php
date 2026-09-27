@@ -53,15 +53,25 @@ class ActivityReminder extends BaseController
         if (!empty($member['id_telegram']) && $member['id_telegram'] !== '-') {
             $this->postBot('/kick-telegram', ['id_telegram' => $member['id_telegram']]);
         }
-        $db->table('tb_member_logs')->insert([
+        $logData = [
             'no_wa' => $member['no_wa'],
             'id_hfm' => $member['id_hfm'],
             'nama' => $member['nama'],
-            'id_telegram' => $member['id_telegram'] ?? null,
             'tipe_aktivitas' => 'keluar_di_remove',
-        ]);
+        ];
+        if ($this->hasMemberLogTelegramColumn($db)) {
+            $logData['id_telegram'] = $member['id_telegram'] ?? null;
+        }
+        $db->table('tb_member_logs')->insert($logData);
         $db->table('tb_member_vip')->where('id', (int) $id)->delete();
         return redirect()->to('/activity-reminders')->with('pesan', 'Member berhasil di-kick dan dihapus oleh admin.');
+    }
+
+    private function hasMemberLogTelegramColumn($db): bool
+    {
+        return (bool) $db->query(
+            "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tb_member_logs' AND COLUMN_NAME = 'id_telegram' LIMIT 1"
+        )->getRow();
     }
 
     private function postBot(string $path, array $payload): void

@@ -114,6 +114,8 @@ class AdminDashboard extends BaseController
     {
         $db = \Config\Database::connect();
 
+        $hasLogTelegram = $this->hasMemberLogTelegramColumn($db);
+
         // Ambil parameter filter
         $search = $this->request->getGet('search') ?? '';
         $tipe = $this->request->getGet('tipe') ?? '';
@@ -126,7 +128,10 @@ class AdminDashboard extends BaseController
 
         // Build query
         $builder = $db->table('tb_member_logs');
-        $builder->select('tb_member_logs.*, tb_member_vip.status as status_member, COALESCE(tb_member_vip.id_telegram, tb_member_logs.id_telegram) as id_telegram');
+        $logTelegramSelect = $hasLogTelegram
+            ? 'COALESCE(tb_member_vip.id_telegram, tb_member_logs.id_telegram)'
+            : 'tb_member_vip.id_telegram';
+        $builder->select("tb_member_logs.*, tb_member_vip.status as status_member, {$logTelegramSelect} as id_telegram");
 
         // 1. SUBQUERY: Mengunci agar hanya mengambil aktivitas paling TERAKHIR per member (Berdasarkan No WA)
         $subquery = "(SELECT no_wa, MAX(created_at) as max_date FROM tb_member_logs GROUP BY no_wa)";
@@ -1187,13 +1192,16 @@ class AdminDashboard extends BaseController
         }
 
         // 3. CATAT KE LOG SEBELUM DIHAPUS
-        $db->table('tb_member_logs')->insert([
+        $logData = [
             'no_wa'          => $cek['no_wa'],
             'nama'           => $cek['nama'],
             'id_hfm'         => $cek['id_hfm'],
-            'id_telegram'    => $cek['id_telegram'] ?? null,
-            'tipe_aktivitas' => 'keluar_di_remove'
-        ]);
+            'tipe_aktivitas' => 'keluar_di_remove',
+        ];
+        if ($this->hasMemberLogTelegramColumn($db)) {
+            $logData['id_telegram'] = $cek['id_telegram'] ?? null;
+        }
+        $db->table('tb_member_logs')->insert($logData);
 
         // 4. HAPUS DATA DARI DATABASE
         $db->table('tb_member_vip')
@@ -1236,13 +1244,16 @@ class AdminDashboard extends BaseController
         curl_close($ch);
 
         // 2. CATAT KE LOG SEBELUM DIHAPUS
-        $db->table('tb_member_logs')->insert([
+        $logData = [
             'no_wa'          => $cek['no_wa'],
             'nama'           => $cek['nama'],
             'id_hfm'         => $cek['id_hfm'],
-            'id_telegram'    => $cek['id_telegram'] ?? null,
-            'tipe_aktivitas' => 'keluar_di_remove'
-        ]);
+            'tipe_aktivitas' => 'keluar_di_remove',
+        ];
+        if ($this->hasMemberLogTelegramColumn($db)) {
+            $logData['id_telegram'] = $cek['id_telegram'] ?? null;
+        }
+        $db->table('tb_member_logs')->insert($logData);
 
         // 3. HAPUS DATA DARI DATABASE
         $db->table('tb_member_vip')
@@ -1251,6 +1262,13 @@ class AdminDashboard extends BaseController
 
         session()->setFlashdata('pesan', 'Data berhasil dihapus & member otomatis di-kick dari WA.');
         return redirect()->to(base_url('AdminDashboard'));
+    }
+
+    private function hasMemberLogTelegramColumn($db): bool
+    {
+        return (bool) $db->query(
+            "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tb_member_logs' AND COLUMN_NAME = 'id_telegram' LIMIT 1"
+        )->getRow();
     }
 
     // ==========================================

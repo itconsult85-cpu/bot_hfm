@@ -13,11 +13,26 @@
 -- so it can be used by the Node process/dashboard configuration if required.
 
 INSERT IGNORE INTO `bot_globals` (`key_name`, `key_value`)
-VALUES ('BOT_CONTROL_TOKEN', CONCAT('hfm_', HEX(RANDOM_BYTES(32))));
+VALUES ('BOT_CONTROL_TOKEN', CONCAT('hfm_', SHA2(CONCAT(UUID(), RAND(), NOW()), 256)));
 
 SELECT `key_name`, `key_value`
 FROM `bot_globals`
 WHERE `key_name` = 'BOT_CONTROL_TOKEN';
+
+
+-- Backward-compatible migration for installations whose old dump lacks this column.
+SET @column_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tb_member_logs'
+    AND COLUMN_NAME = 'id_telegram'
+);
+SET @sql := IF(@column_exists = 0,
+  'ALTER TABLE tb_member_logs ADD COLUMN id_telegram VARCHAR(50) NULL AFTER id_hfm',
+  'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- The following values belong in the server environment, not in this SQL file:
 -- HFM_API_KEY=<HFM partner API key>
