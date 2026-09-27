@@ -57,6 +57,14 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->get('AdminDashboard/campaigns', 'AdminDashboard::campaigns');
     $routes->get('AdminDashboard/campaignRawClicks', 'AdminDashboard::campaignRawClicks');
 
+    // CRUD link grup Telegram & WhatsApp
+    $routes->get('bot-group-links', 'BotGroupLink::index');
+    $routes->get('bot-group-links/create', 'BotGroupLink::create');
+    $routes->post('bot-group-links/store', 'BotGroupLink::store');
+    $routes->get('bot-group-links/edit/(:num)', 'BotGroupLink::edit/$1');
+    $routes->post('bot-group-links/update/(:num)', 'BotGroupLink::update/$1');
+    $routes->get('bot-group-links/delete/(:num)', 'BotGroupLink::delete/$1');
+
     // Modifikasi ACID code wallet via API HFM
     $routes->get('client-acid-code-modification', 'ClientAcidCodeModification::index');
     $routes->post('client-acid-code-modification/modify', 'ClientAcidCodeModification::modify');

@@ -10,6 +10,28 @@ class AdminDashboard extends BaseController
     private $apiKey = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
     private $baseUrl = "https://api.hfm-partners.com/api";
 
+    private function postBotJson(string $path, array $payload): array
+    {
+        $ch = curl_init('http://127.0.0.1:3000' . $path);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT => 10,
+        ]);
+        $raw = curl_exec($ch);
+        $error = curl_error($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $data = json_decode($raw ?: '', true);
+        return [
+            'ok' => !$error && $httpCode >= 200 && $httpCode < 300 && (($data['status'] ?? null) === 'success' || $httpCode === 200),
+            'message' => $error ?: ($data['message'] ?? $data['error'] ?? ('HTTP ' . $httpCode)),
+        ];
+    }
+
     // ==========================================
     // DASHBOARD UTAMA
     // ==========================================
@@ -1148,21 +1170,19 @@ class AdminDashboard extends BaseController
 
         $pesanKick = "";
 
-        // 2. KIRIM PERINTAH KICK KE BOT (HANYA JIKA TIDAK ADA DUPLIKAT)
-        if ($duplikat == 0 && !empty($cek['id_telegram']) && $cek['id_telegram'] !== '-') {
-            $urlBot = "http://127.0.0.1:3000/kick-telegram";
-
-            $ch = curl_init($urlBot);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['id_telegram' => $cek['id_telegram']]));
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-
-            curl_exec($ch);
-            curl_close($ch);
-
-            $pesanKick = " & member otomatis di-kick dari Telegram.";
+        // 2. KIRIM KICK KE TELEGRAM DAN WHATSAPP (HANYA JIKA TIDAK ADA DUPLIKAT)
+        if ($duplikat == 0) {
+            $hasilKick = [];
+            if (!empty($cek['id_telegram']) && $cek['id_telegram'] !== '-') {
+                $hasilKick['Telegram'] = $this->postBotJson('/kick-telegram', ['id_telegram' => $cek['id_telegram']]);
+            }
+            if (!empty($cek['no_wa']) && $cek['no_wa'] !== '-') {
+                $hasilKick['WhatsApp'] = $this->postBotJson('/kick-member', ['nomor' => $cek['no_wa']]);
+            }
+            $berhasil = array_keys(array_filter($hasilKick, static fn ($result) => $result['ok']));
+            $gagal = array_keys(array_filter($hasilKick, static fn ($result) => !$result['ok']));
+            $pesanKick = $berhasil ? ' & kick dikirim ke ' . implode(' dan ', $berhasil) . '.' : '';
+            if ($gagal) $pesanKick .= ' Gagal kick ' . implode(' dan ', $gagal) . ': bot belum terhubung atau data grup belum benar.';
         } else {
             // Jika ada duplikat, batalkan kick agar akun utamanya tidak terhapus dari grup
             $pesanKick = " (Member TIDAK di-kick karena masih ada data aslinya).";

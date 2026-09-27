@@ -40,6 +40,64 @@ class Client extends BaseController
         return $this->response->setJSON(['status' => 'success', 'dikirim' => $berhasil]);
     }
 
+    public function apiGroupLinks()
+    {
+        $db = \Config\Database::connect();
+        $links = $db->table('bot_group_links')
+            ->select('platform, group_name, invite_link, group_id')
+            ->where('is_active', 1)
+            ->get()->getResultArray();
+        $result = [];
+        foreach ($links as $link) $result[$link['platform']] = $link;
+        return $this->response->setJSON(['status' => 'ok', 'links' => $result]);
+    }
+
+    public function apiWhatsAppGroupJoin()
+    {
+        $payload = $this->request->getJSON(true) ?: $this->request->getPost();
+        $whatsappId = trim((string) ($payload['whatsapp_id'] ?? ''));
+        $phone = preg_replace('/\D+/', '', (string) ($payload['phone_number'] ?? $whatsappId));
+        $groupId = trim((string) ($payload['group_id'] ?? ''));
+        $displayName = trim((string) ($payload['display_name'] ?? ''));
+        if ($whatsappId === '' || $groupId === '') return $this->response->setStatusCode(422)->setJSON(['status' => 'error', 'pesan' => 'whatsapp_id dan group_id wajib diisi.']);
+
+        $canonical = static function (string $value): string {
+            $digits = preg_replace('/\D+/', '', $value);
+            return str_starts_with($digits, '0') ? '62' . substr($digits, 1) : $digits;
+        };
+        $db = \Config\Database::connect();
+        $members = $db->table('tb_member_vip')->select('no_wa')->get()->getResultArray();
+        foreach ($members as $member) {
+            if ($canonical((string) $member['no_wa']) === $canonical($phone)) {
+                return $this->response->setJSON(['status' => 'known_member', 'pesan' => 'Member sudah ada di tb_member_vip; tidak dicatat ulang.']);
+            }
+        }
+
+        $existing = $db->table('whatsapp_group_members')
+            ->where('whatsapp_id', $whatsappId)
+            ->where('group_id', $groupId)
+            ->get()->getRowArray();
+        if ($existing) {
+            $db->table('whatsapp_group_members')->where('id', $existing['id'])->update([
+                'phone_number' => $phone,
+                'display_name' => $displayName,
+                'status' => 'active',
+                'left_at' => null,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+            return $this->response->setJSON(['status' => 'already_recorded', 'pesan' => 'Member sudah pernah dicatat; data diaktifkan kembali.']);
+        }
+        $db->table('whatsapp_group_members')->insert([
+            'whatsapp_id' => $whatsappId,
+            'phone_number' => $phone,
+            'display_name' => $displayName,
+            'group_id' => $groupId,
+            'status' => 'active',
+            'joined_at' => date('Y-m-d H:i:s'),
+        ]);
+        return $this->response->setJSON(['status' => 'new_member', 'pesan' => 'Member WhatsApp baru berhasil dicatat.']);
+    }
+
     public function apiLaporanHarian()
     {
         $db = \Config\Database::connect();
