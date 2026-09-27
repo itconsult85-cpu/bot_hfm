@@ -1170,19 +1170,12 @@ class AdminDashboard extends BaseController
 
         $pesanKick = "";
 
-        // 2. KIRIM KICK KE TELEGRAM DAN WHATSAPP (HANYA JIKA TIDAK ADA DUPLIKAT)
+        // 2. KIRIM KICK KE TELEGRAM (HANYA JIKA TIDAK ADA DUPLIKAT)
         if ($duplikat == 0) {
-            $hasilKick = [];
             if (!empty($cek['id_telegram']) && $cek['id_telegram'] !== '-') {
-                $hasilKick['Telegram'] = $this->postBotJson('/kick-telegram', ['id_telegram' => $cek['id_telegram']]);
+                $hasilKick = $this->postBotJson('/kick-telegram', ['id_telegram' => $cek['id_telegram']]);
+                $pesanKick = $hasilKick['ok'] ? ' & member otomatis di-kick dari Telegram.' : ' (kick Telegram gagal: ' . $hasilKick['message'] . ').';
             }
-            if (!empty($cek['no_wa']) && $cek['no_wa'] !== '-') {
-                $hasilKick['WhatsApp'] = $this->postBotJson('/kick-member', ['nomor' => $cek['no_wa']]);
-            }
-            $berhasil = array_keys(array_filter($hasilKick, static fn ($result) => $result['ok']));
-            $gagal = array_keys(array_filter($hasilKick, static fn ($result) => !$result['ok']));
-            $pesanKick = $berhasil ? ' & kick dikirim ke ' . implode(' dan ', $berhasil) . '.' : '';
-            if ($gagal) $pesanKick .= ' Gagal kick ' . implode(' dan ', $gagal) . ': bot belum terhubung atau data grup belum benar.';
         } else {
             // Jika ada duplikat, batalkan kick agar akun utamanya tidak terhapus dari grup
             $pesanKick = " (Member TIDAK di-kick karena masih ada data aslinya).";

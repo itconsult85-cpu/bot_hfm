@@ -54,6 +54,34 @@ class BotGroupLink extends BaseController
         return $this->saveLink((int) $id);
     }
 
+    public function sendWhatsAppButton($id)
+    {
+        $link = $this->model->where('id', (int) $id)->where('platform', 'whatsapp')->where('is_active', 1)->first();
+        $telegram = $this->model->where('platform', 'telegram')->where('is_active', 1)->first();
+        if (!$link || !$telegram) {
+            return redirect()->to('/bot-group-links')->with('error', 'Link WhatsApp dan konfigurasi Telegram aktif wajib tersedia.');
+        }
+
+        $ch = curl_init('http://127.0.0.1:3000/send-whatsapp-button');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => json_encode(['source_link_id' => (int) $id, 'telegram_group_id' => $telegram['group_id']]),
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        $raw = curl_exec($ch);
+        $error = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $data = json_decode($raw ?: '', true);
+        if ($error || $status < 200 || $status >= 300 || ($data['status'] ?? '') !== 'success') {
+            return redirect()->to('/bot-group-links')->with('error', 'Gagal mengirim tombol ke grup Telegram: ' . ($error ?: ($data['error'] ?? 'bot tidak merespons.')));
+        }
+        return redirect()->to('/bot-group-links')->with('pesan', 'Tombol link WhatsApp berhasil dikirim ke grup Telegram.');
+    }
+
     public function delete($id)
     {
         if (!$this->model->find((int) $id)) {

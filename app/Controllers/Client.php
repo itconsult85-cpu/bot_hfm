@@ -44,7 +44,7 @@ class Client extends BaseController
     {
         $db = \Config\Database::connect();
         $links = $db->table('bot_group_links')
-            ->select('platform, group_name, invite_link, group_id')
+            ->select('id, platform, group_name, invite_link, group_id')
             ->where('is_active', 1)
             ->get()->getResultArray();
         $result = [];
@@ -429,6 +429,8 @@ class Client extends BaseController
         $nama_form = $json->nama ?? ''; // Nama dari inputan form user
         $email = $json->email ?? '';
         $id_telegram = $json->id_telegram ?? '';
+        $registrationSource = trim((string) ($json->registration_source ?? '')) ?: null;
+        $registrationSourceId = !empty($json->registration_source_id) ? (int) $json->registration_source_id : null;
 
         if (!$id_hfm || !$no_wa || !$nama_form) {
             return $this->response->setJSON(['status' => 'error', 'pesan' => 'Data formulir tidak lengkap.']);
@@ -500,6 +502,8 @@ class Client extends BaseController
             'nama'        => $nama_real,
             'email'       => $email,
             'id_telegram' => $id_telegram,
+            'registration_source' => $registrationSource,
+            'registration_source_id' => $registrationSourceId,
             'deposit'     => $deposit_real,
             'currency'    => $currency_real,
             'status'      => 'aktif',

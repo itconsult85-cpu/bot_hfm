@@ -3,7 +3,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h4 class="fw-bold mb-1"><i class="bi bi-link-45deg text-primary me-2"></i><?= esc($title) ?></h4>
-        <p class="text-muted small mb-0">Link dikirim dinamis oleh bot setelah pendaftaran berhasil.</p>
+        <p class="text-muted small mb-0">Admin dapat mengirim tombol WhatsApp ke grup Telegram. User akan diverifikasi melalui deep-link sebelum menerima link.</p>
     </div>
     <a href="<?= base_url('bot-group-links/create') ?>" class="btn btn-primary rounded-pill px-4"><i class="bi bi-plus-lg me-1"></i>Tambah Link</a>
 </div>
@@ -22,7 +22,7 @@
                     <td><a href="<?= esc($link['invite_link']) ?>" target="_blank" rel="noopener noreferrer" class="text-break small"><?= esc($link['invite_link']) ?></a></td>
                     <td><code><?= esc($link['group_id']) ?></code></td>
                     <td><?= $link['is_active'] ? '<span class="badge bg-success">Aktif</span>' : '<span class="badge bg-secondary">Nonaktif</span>' ?></td>
-                    <td class="text-end text-nowrap"><a href="<?= base_url('bot-group-links/edit/' . $link['id']) ?>" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-pencil"></i></a> <a href="<?= base_url('bot-group-links/delete/' . $link['id']) ?>" class="btn btn-sm btn-outline-danger rounded-pill" data-confirm="Hapus konfigurasi link ini?"><i class="bi bi-trash"></i></a></td>
+                    <td class="text-end text-nowrap"><?php if ($link['platform'] === 'whatsapp' && $link['is_active']): ?><a href="<?= base_url('bot-group-links/send-whatsapp/' . $link['id']) ?>" class="btn btn-sm btn-outline-success rounded-pill" data-confirm="Kirim tombol link WhatsApp ke grup Telegram sekarang?"><i class="bi bi-send"></i></a> <?php endif; ?><a href="<?= base_url('bot-group-links/edit/' . $link['id']) ?>" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-pencil"></i></a> <a href="<?= base_url('bot-group-links/delete/' . $link['id']) ?>" class="btn btn-sm btn-outline-danger rounded-pill" data-confirm="Hapus konfigurasi link ini?"><i class="bi bi-trash"></i></a></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
