@@ -11,6 +11,7 @@
     </div>
 
     <form action="<?= isset($global) ? base_url('bot-global/update/' . $global['id']) : base_url('bot-global/store') ?>" method="POST">
+        <?= csrf_field() ?>
 
         <div class="mb-3">
             <label class="form-label fw-semibold text-muted small">Nama Key (Tanpa Spasi)</label>

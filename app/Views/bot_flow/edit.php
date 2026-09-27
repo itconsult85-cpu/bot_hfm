@@ -11,6 +11,7 @@
     </div>
 
     <form action="<?= isset($flow) ? base_url('bot-flow/update/' . $flow['id']) : base_url('bot-flow/store') ?>" method="POST">
+        <?= csrf_field() ?>
 
         <div class="row g-3 mb-3">
             <div class="col-12 col-md-3">

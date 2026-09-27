@@ -11,6 +11,7 @@
     </div>
 
     <form action="<?= isset($faq) ? base_url('bot-faq/update/' . $faq['id']) : base_url('bot-faq/store') ?>" method="POST">
+        <?= csrf_field() ?>
 
         <div class="mb-3">
             <label class="form-label fw-semibold text-muted small">Keywords (Pisahkan dengan koma)</label>

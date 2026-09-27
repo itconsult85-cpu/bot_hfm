@@ -102,6 +102,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="<?= base_url('admin/update-member') ?>" method="POST">
+                    <?= csrf_field() ?>
                     <div class="modal-body p-4">
                         <div class="mb-3">
                             <label class="form-label small fw-semibold text-muted">ID HFM (Read Only)</label>

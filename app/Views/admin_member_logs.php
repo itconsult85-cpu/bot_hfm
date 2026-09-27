@@ -375,6 +375,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="<?= base_url('admin/update-id-quick') ?>" method="POST">
+                <?= csrf_field() ?>
                 <div class="modal-body p-4">
                     <p class="text-muted small mb-3">Perbaiki ID Trading yang salah secara langsung.</p>
                     <input type="hidden" id="quick_old_id" name="old_id_hfm">
