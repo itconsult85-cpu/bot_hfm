@@ -30,7 +30,7 @@ Struktur tabel tidak diubah oleh hardening ini. SQL tambahan hanya memastikan `B
 
 Salin `.env.example` menjadi `.env` untuk proses Node, kemudian isi `DB_*`, `CI_BASE_URL`, dan `HFM_API_KEY`. Jangan menyimpan nilai asli di Git atau dump SQL. `TELEGRAM_TOKEN`, `GEMINI_API_KEY`, dan `BOT_CONTROL_TOKEN` tetap dibaca dari `bot_globals`; semua secret lama yang pernah masuk source/dump harus dicabut dan dibuat ulang pada provider masing-masing.
 
-Jalankan sekali:
+Jalankan sekali. Jika memakai phpMyAdmin, pilih database CI4 pada panel kiri terlebih dahulu, lalu buka tab **SQL** dan jalankan seluruh isi file. Error MySQL `#1046 No database selected` berarti database belum dipilih.
 
 ```bash
 mysql -u <user> -p <database> < sql/security_hardening.sql

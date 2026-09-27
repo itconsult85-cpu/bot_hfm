@@ -10,7 +10,6 @@ class ClientAcidCodeModification extends BaseController
 
     public function __construct()
     {
-        parent::__construct();
         $this->apiKey = (string) (getenv('HFM_API_KEY') ?: '');
     }
     private string $baseUrl = 'https://api.hfm-partners.com/api';
