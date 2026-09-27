@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\BotGroupLinkModel;
+use CodeIgniter\Database\Exceptions\DatabaseException;
 
 class BotGroupLink extends BaseController
 {
@@ -15,9 +16,23 @@ class BotGroupLink extends BaseController
 
     public function index()
     {
+        try {
+            $links = $this->model->orderBy('platform', 'ASC')->orderBy('id', 'ASC')->findAll();
+        } catch (DatabaseException $e) {
+            if ((int) $e->getCode() !== 1146) {
+                throw $e;
+            }
+
+            return view('bot_group_links/index', [
+                'title' => 'Link Grup Telegram & WhatsApp',
+                'links' => [],
+                'setupError' => 'Tabel bot_group_links belum tersedia. Jalankan migration CodeIgniter dengan perintah: php spark migrate',
+            ]);
+        }
+
         return view('bot_group_links/index', [
             'title' => 'Link Grup Telegram & WhatsApp',
-            'links' => $this->model->orderBy('platform', 'ASC')->orderBy('id', 'ASC')->findAll(),
+            'links' => $links,
         ]);
     }
 

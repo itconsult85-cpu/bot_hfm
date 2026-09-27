@@ -9,6 +9,7 @@
 </div>
 <?php if ($message = session()->getFlashdata('pesan')): ?><div class="alert alert-success alert-dismissible fade show"><?= esc($message) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><?php endif; ?>
 <?php if ($message = session()->getFlashdata('error')): ?><div class="alert alert-danger alert-dismissible fade show"><?= esc($message) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><?php endif; ?>
+<?php if (!empty($setupError)): ?><div class="alert alert-warning"><strong>Setup database diperlukan.</strong><br><?= esc($setupError) ?><br>Atau jalankan SQL <code>sql/whatsapp_group_links.sql</code> pada database aplikasi.</div><?php endif; ?>
 <div class="card border-0 shadow-sm rounded-4 p-4">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
