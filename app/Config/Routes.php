@@ -126,6 +126,8 @@ $routes->get('client/apiMemberKeluarIB', 'Client::apiMemberKeluarIB');
 $routes->post('client/prosesFollowUp', 'Client::prosesFollowUp');
 $routes->post('client/run-activity-reminders', 'ActivityReminder::runScheduled');
 $routes->get('client/bot-schedules', 'BotSchedule::api');
+$routes->get('client/apiGroupLinks', 'Client::apiGroupLinks');
+$routes->post('client/apiWhatsAppGroupJoin', 'Client::apiWhatsAppGroupJoin');
 $routes->get('client/apiHapusMemberGrup/(:any)', 'Client::apiHapusMemberGrup/$1');
 $routes->get('client/apiLaporanHarian', 'Client::apiLaporanHarian');
 $routes->post('client/simpanMemberForm', 'Client::simpanMemberForm');
