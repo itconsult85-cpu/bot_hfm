@@ -8,7 +8,7 @@
             <h4 class="fw-bold tracking-tight text-primary mb-1" style="font-size: 1.25rem;">
                 <i class="bi bi-globe me-2"></i><?= esc($title ?? 'Variabel Global Bot') ?>
             </h4>
-            <p class="text-muted small mb-0" style="font-size: 0.8rem;">Kelola kata kunci statis yang digunakan bot di berbagai alur.</p>
+            <p class="text-muted small mb-0" style="font-size: 0.8rem;">Kelola variabel bot. ID grup Telegram dikelola khusus di menu Link Grup Tele &amp; WhatsApp agar tidak ada input ganda.</p>
         </div>
         <div class="col-12 col-md-auto">
             <a href="<?= base_url('bot-global/create') ?>" class="btn btn-primary rounded-pill w-100 px-4 py-2 small fw-semibold shadow-sm text-nowrap">

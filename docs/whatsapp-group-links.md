@@ -20,6 +20,8 @@ Dashboard
 
 Buka **Pengaturan Bot → Link Grup Tele & WhatsApp**.
 
+Konfigurasi grup Telegram sebelumnya yang tersimpan sebagai `ID_GRUP_VIP` di `bot_globals` akan dimigrasikan ke baris platform Telegram pada `bot_group_links`. Setelah migration, `ID_GRUP_VIP` tidak lagi digunakan oleh bot dan tidak ditampilkan sebagai input di menu **Bot Global**.
+
 Buat dua konfigurasi aktif:
 
 1. **Telegram**
@@ -29,6 +31,8 @@ Buat dua konfigurasi aktif:
    - Link undangan WhatsApp asli.
    - Nama grup WhatsApp.
    - ID source otomatis berasal dari kolom `id` tabel `bot_group_links`.
+
+`bot.js` workspace membaca `group_id` Telegram dan `invite_link` Telegram/WhatsApp melalui endpoint `client/apiGroupLinks`, sehingga perubahan dari dashboard dapat dipakai tanpa input ulang di `bot_globals`.
 
 Pada baris link WhatsApp, klik tombol **kirim**. Bot akan mengirim tombol **Gabung Grup WhatsApp** ke grup Telegram yang dikonfigurasi.
 

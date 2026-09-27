@@ -15,6 +15,16 @@ CREATE TABLE IF NOT EXISTS `bot_group_links` (
   KEY `idx_bot_group_links_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Migrasikan ID_GRUP_VIP lama jika tersedia. Link undangan dapat diisi dari dashboard.
+INSERT INTO `bot_group_links` (`platform`, `group_name`, `invite_link`, `group_id`, `is_active`)
+SELECT 'telegram', 'Grup VIP Telegram', '', TRIM(g.`key_value`), 1
+FROM `bot_globals` g
+WHERE g.`key_name` = 'ID_GRUP_VIP'
+  AND TRIM(g.`key_value`) <> ''
+  AND NOT EXISTS (
+    SELECT 1 FROM `bot_group_links` b WHERE b.`platform` = 'telegram'
+  );
+
 CREATE TABLE IF NOT EXISTS `whatsapp_group_members` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `whatsapp_id` VARCHAR(100) NOT NULL,

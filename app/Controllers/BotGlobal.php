@@ -17,7 +17,8 @@ class BotGlobal extends BaseController
     {
         $data = [
             'title'   => 'Pengaturan Variabel Global Bot',
-            'globals' => $this->globalModel->findAll()
+            // ID_GRUP_VIP dipelihara melalui CRUD Link Grup agar tidak ada input ganda.
+            'globals' => $this->globalModel->where('key_name !=', 'ID_GRUP_VIP')->findAll()
         ];
         return view('bot_global/index', $data);
     }
@@ -29,6 +30,10 @@ class BotGlobal extends BaseController
 
     public function store()
     {
+        if (strtoupper(trim((string) $this->request->getPost('key_name'))) === 'ID_GRUP_VIP') {
+            return redirect()->to('/bot-group-links')->with('error', 'ID grup Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
+        }
+
         $this->globalModel->save([
             'key_name'  => $this->request->getPost('key_name'),
             'key_value' => $this->request->getPost('key_value')
@@ -38,15 +43,25 @@ class BotGlobal extends BaseController
 
     public function edit($id)
     {
+        $global = $this->globalModel->find($id);
+        if (($global['key_name'] ?? '') === 'ID_GRUP_VIP') {
+            return redirect()->to('/bot-group-links')->with('error', 'ID grup Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
+        }
+
         $data = [
-            'title'  => 'Edit Variabel Global',
-            'global' => $this->globalModel->find($id)
+            'title'  => 'Edit Variabel Global Bot',
+            'global' => $global
         ];
         return view('bot_global/edit', $data);
     }
 
     public function update($id)
     {
+        $global = $this->globalModel->find($id);
+        if (($global['key_name'] ?? '') === 'ID_GRUP_VIP' || strtoupper(trim((string) $this->request->getPost('key_name'))) === 'ID_GRUP_VIP') {
+            return redirect()->to('/bot-group-links')->with('error', 'ID grup Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
+        }
+
         $this->globalModel->update($id, [
             'key_name'  => $this->request->getPost('key_name'),
             'key_value' => $this->request->getPost('key_value')
@@ -56,6 +71,11 @@ class BotGlobal extends BaseController
 
     public function delete($id)
     {
+        $global = $this->globalModel->find($id);
+        if (($global['key_name'] ?? '') === 'ID_GRUP_VIP') {
+            return redirect()->to('/bot-group-links')->with('error', 'ID grup Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
+        }
+
         $this->globalModel->delete($id);
         return redirect()->to('/bot-global')->with('pesan', 'Variabel berhasil dihapus.');
     }
