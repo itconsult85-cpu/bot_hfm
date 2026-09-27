@@ -49,7 +49,12 @@ class Client extends BaseController
             ->get()->getResultArray();
         $result = [];
         foreach ($links as $link) $result[$link['platform']] = $link;
-        return $this->response->setJSON(['status' => 'ok', 'links' => $result]);
+        $admin = $db->table('bot_globals')->where('key_name', 'ID_ADMIN')->get()->getRowArray();
+        return $this->response->setJSON([
+            'status' => 'ok',
+            'links' => $result,
+            'admin_id' => trim((string) ($admin['key_value'] ?? '')),
+        ]);
     }
 
     public function apiWhatsAppGroupJoin()

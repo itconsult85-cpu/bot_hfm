@@ -17,8 +17,10 @@ class BotGlobal extends BaseController
     {
         $data = [
             'title'   => 'Pengaturan Variabel Global Bot',
-            // ID_GRUP_VIP dipelihara melalui CRUD Link Grup agar tidak ada input ganda.
-            'globals' => $this->globalModel->where('key_name !=', 'ID_GRUP_VIP')->findAll()
+            // ID_GRUP_VIP dan ID_ADMIN dipelihara di CRUD Link Grup agar tidak ada input ganda.
+            'globals' => $this->globalModel
+                ->whereNotIn('key_name', ['ID_GRUP_VIP', 'ID_ADMIN'])
+                ->findAll()
         ];
         return view('bot_global/index', $data);
     }
@@ -30,8 +32,9 @@ class BotGlobal extends BaseController
 
     public function store()
     {
-        if (strtoupper(trim((string) $this->request->getPost('key_name'))) === 'ID_GRUP_VIP') {
-            return redirect()->to('/bot-group-links')->with('error', 'ID grup Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
+        $keyName = strtoupper(trim((string) $this->request->getPost('key_name')));
+        if (in_array($keyName, ['ID_GRUP_VIP', 'ID_ADMIN'], true)) {
+            return redirect()->to('/bot-group-links')->with('error', 'ID grup dan ID admin Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
         }
 
         $this->globalModel->save([
@@ -44,22 +47,22 @@ class BotGlobal extends BaseController
     public function edit($id)
     {
         $global = $this->globalModel->find($id);
-        if (($global['key_name'] ?? '') === 'ID_GRUP_VIP') {
-            return redirect()->to('/bot-group-links')->with('error', 'ID grup Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
+        if (in_array(($global['key_name'] ?? ''), ['ID_GRUP_VIP', 'ID_ADMIN'], true)) {
+            return redirect()->to('/bot-group-links')->with('error', 'ID grup dan ID admin Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
         }
 
-        $data = [
+        return view('bot_global/edit', [
             'title'  => 'Edit Variabel Global Bot',
             'global' => $global
-        ];
-        return view('bot_global/edit', $data);
+        ]);
     }
 
     public function update($id)
     {
         $global = $this->globalModel->find($id);
-        if (($global['key_name'] ?? '') === 'ID_GRUP_VIP' || strtoupper(trim((string) $this->request->getPost('key_name'))) === 'ID_GRUP_VIP') {
-            return redirect()->to('/bot-group-links')->with('error', 'ID grup Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
+        $keyName = strtoupper(trim((string) $this->request->getPost('key_name')));
+        if (in_array(($global['key_name'] ?? ''), ['ID_GRUP_VIP', 'ID_ADMIN'], true) || in_array($keyName, ['ID_GRUP_VIP', 'ID_ADMIN'], true)) {
+            return redirect()->to('/bot-group-links')->with('error', 'ID grup dan ID admin Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
         }
 
         $this->globalModel->update($id, [
@@ -72,8 +75,8 @@ class BotGlobal extends BaseController
     public function delete($id)
     {
         $global = $this->globalModel->find($id);
-        if (($global['key_name'] ?? '') === 'ID_GRUP_VIP') {
-            return redirect()->to('/bot-group-links')->with('error', 'ID grup Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
+        if (in_array(($global['key_name'] ?? ''), ['ID_GRUP_VIP', 'ID_ADMIN'], true)) {
+            return redirect()->to('/bot-group-links')->with('error', 'ID grup dan ID admin Telegram sekarang dikelola dari menu Link Grup Tele & WhatsApp.');
         }
 
         $this->globalModel->delete($id);

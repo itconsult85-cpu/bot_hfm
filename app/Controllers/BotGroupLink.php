@@ -16,6 +16,9 @@ class BotGroupLink extends BaseController
 
     public function index()
     {
+        $db = \Config\Database::connect();
+        $adminRow = $db->table('bot_globals')->where('key_name', 'ID_ADMIN')->get()->getRowArray();
+
         try {
             $links = $this->model->orderBy('platform', 'ASC')->orderBy('id', 'ASC')->findAll();
         } catch (DatabaseException $e) {
@@ -26,6 +29,7 @@ class BotGroupLink extends BaseController
             return view('bot_group_links/index', [
                 'title' => 'Link Grup Telegram & WhatsApp',
                 'links' => [],
+                'adminId' => $adminRow['key_value'] ?? '',
                 'setupError' => 'Tabel bot_group_links belum tersedia. Jalankan migration CodeIgniter dengan perintah: php spark migrate',
             ]);
         }
@@ -33,7 +37,26 @@ class BotGroupLink extends BaseController
         return view('bot_group_links/index', [
             'title' => 'Link Grup Telegram & WhatsApp',
             'links' => $links,
+            'adminId' => $adminRow['key_value'] ?? '',
         ]);
+    }
+
+    public function updateAdminId()
+    {
+        $adminId = trim((string) $this->request->getPost('admin_id'));
+        if ($adminId === '' || !preg_match('/^\d{5,20}$/', $adminId)) {
+            return redirect()->to('/bot-group-links')->with('error', 'ID Admin Telegram harus berupa angka 5 sampai 20 digit.');
+        }
+
+        $db = \Config\Database::connect();
+        $row = $db->table('bot_globals')->where('key_name', 'ID_ADMIN')->get()->getRowArray();
+        if ($row) {
+            $db->table('bot_globals')->where('id', $row['id'])->update(['key_value' => $adminId]);
+        } else {
+            $db->table('bot_globals')->insert(['key_name' => 'ID_ADMIN', 'key_value' => $adminId]);
+        }
+
+        return redirect()->to('/bot-group-links')->with('pesan', 'ID Admin Telegram berhasil diperbarui.');
     }
 
     public function create()

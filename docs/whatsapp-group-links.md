@@ -20,6 +20,8 @@ Dashboard
 
 Buka **Pengaturan Bot → Link Grup Tele & WhatsApp**.
 
+Di bagian atas tabel tersedia input **ID Admin Telegram**. Nilai awal diambil dari key `ID_ADMIN` yang sudah ada di `bot_globals`; menyimpan perubahan dari halaman ini akan memperbarui record yang sama. Key `ID_ADMIN` tidak lagi ditampilkan atau dapat diubah dari menu **Bot Global**.
+
 Konfigurasi grup Telegram sebelumnya yang tersimpan sebagai `ID_GRUP_VIP` di `bot_globals` akan dimigrasikan ke baris platform Telegram pada `bot_group_links`. Setelah migration, `ID_GRUP_VIP` tidak lagi digunakan oleh bot dan tidak ditampilkan sebagai input di menu **Bot Global**.
 
 Buat dua konfigurasi aktif:
@@ -33,6 +35,7 @@ Buat dua konfigurasi aktif:
    - ID source otomatis berasal dari kolom `id` tabel `bot_group_links`.
 
 `bot.js` workspace membaca `group_id` Telegram dan `invite_link` Telegram/WhatsApp melalui endpoint `client/apiGroupLinks`, sehingga perubahan dari dashboard dapat dipakai tanpa input ulang di `bot_globals`.
+Endpoint yang sama juga mengirim `admin_id` terbaru. Bot memakai nilai tersebut untuk mengenali admin, membuat tautan chat admin, dan mengganti ID admin tanpa perlu mengubah file bot.
 
 Pada baris link WhatsApp, klik tombol **kirim**. Bot akan mengirim tombol **Gabung Grup WhatsApp** ke grup Telegram yang dikonfigurasi.
 
