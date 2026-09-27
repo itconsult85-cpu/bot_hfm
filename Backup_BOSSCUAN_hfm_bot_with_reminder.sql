@@ -119,8 +119,8 @@ SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 LOCK TABLES `bot_globals` WRITE;
 /*!40000 ALTER TABLE `bot_globals` DISABLE KEYS */;
 INSERT INTO `bot_globals` VALUES
-(1,'TELEGRAM_TOKEN','8916459016:AAGEl8rdvvD5Ucdpm7YPvei3VQvI6bL2PsE'),
-(2,'GEMINI_API_KEY','AIzaSyCl5_5gbNWhcEk1bIFqc75-67uq-Kel5wU'),
+(1,'TELEGRAM_TOKEN','SET_IN_SERVER_ONLY'),
+(2,'GEMINI_API_KEY','SET_IN_SERVER_ONLY'),
 (3,'GEMINI_MODEL','gemini-2.5-flash-lite'),
 (4,'LINK_DAFTAR','https://register.hfmtrade-ind.com/sv/id/new-live-account/?refid=353068&acid=g0olqxh5h3'),
 (5,'KODE_IB','g0olqxh5h3'),

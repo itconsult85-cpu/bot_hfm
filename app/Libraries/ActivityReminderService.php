@@ -8,7 +8,6 @@ use DateTimeZone;
 
 class ActivityReminderService
 {
-    private const HFM_API_KEY = '127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e';
     private const HFM_BASE_URL = 'https://api.hfm-partners.com/api/clients/';
     public function eligibleMembers(?string $phase = null): array
     {
@@ -258,9 +257,9 @@ class ActivityReminderService
             $ch = curl_init(self::HFM_BASE_URL . rawurlencode($id) . '/report');
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . self::HFM_API_KEY, 'Accept: application/json'],
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . (string) (getenv('HFM_API_KEY') ?: ''), 'Accept: application/json'],
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
                 CURLOPT_CONNECTTIMEOUT => 8,
                 CURLOPT_TIMEOUT => 20,
                 CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
@@ -319,7 +318,7 @@ class ActivityReminderService
         $ch = curl_init(self::HFM_BASE_URL . rawurlencode($idHfm) . '/report');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . self::HFM_API_KEY, 'Accept: application/json'],
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . (string) (getenv('HFM_API_KEY') ?: ''), 'Accept: application/json'],
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_CONNECTTIMEOUT => 8,
             CURLOPT_TIMEOUT => 20,

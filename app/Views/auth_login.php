@@ -22,6 +22,7 @@
             <?php endif; ?>
 
             <form action="<?= base_url('auth/loginProcess') ?>" method="post">
+                <?= csrf_field() ?>
                 <div class="mb-3">
                     <input type="text" name="username" class="form-control" placeholder="Username" required>
                 </div>

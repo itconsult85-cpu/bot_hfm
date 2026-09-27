@@ -58,7 +58,7 @@ class BotSchedule extends BaseController
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'X-Bot-Control-Token: ' . $token],
             CURLOPT_POSTFIELDS     => json_encode(['token' => $token]),
             CURLOPT_TIMEOUT        => 15,
         ]);
@@ -96,7 +96,7 @@ class BotSchedule extends BaseController
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Bot-Control-Token: ' . $token],
             CURLOPT_POSTFIELDS => json_encode(['token' => $token]),
             CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_TIMEOUT => 90,

@@ -199,7 +199,7 @@ class Client extends BaseController
         $builder = $db->table('tb_member_vip')->where('status', 'aktif');
 
         $dataPasif = [];
-        $api_key = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
+        $api_key = (string) (getenv('HFM_API_KEY') ?: '');
         $batasHariPasif = 30;
         $sekarang = new \DateTime(date('Y-m-d'));
 
@@ -215,7 +215,7 @@ class Client extends BaseController
                     'Authorization: Bearer ' . $api_key,
                     'Accept: application/json'
                 ]);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 5);
 
                 $response = curl_exec($ch);
@@ -303,7 +303,7 @@ class Client extends BaseController
             }
         }
 
-        $api_key = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
+        $api_key = (string) (getenv('HFM_API_KEY') ?: '');
         $url = "https://api.hfm-partners.com/api/clients/" . $id_hfm . "/report";
 
         $ch = curl_init($url);
@@ -312,7 +312,7 @@ class Client extends BaseController
             'Authorization: Bearer ' . $api_key,
             'Accept: application/json'
         ]);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
 
@@ -450,7 +450,7 @@ class Client extends BaseController
         }
 
         // 2. TARIK DATA OTOMATIS DARI API HFM
-        $api_key = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
+        $api_key = (string) (getenv('HFM_API_KEY') ?: '');
         $url = "https://api.hfm-partners.com/api/clients/" . $id_hfm . "/report";
 
         $ch = curl_init($url);
@@ -459,7 +459,7 @@ class Client extends BaseController
             'Authorization: Bearer ' . $api_key,
             'Accept: application/json'
         ]);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
 
         $response = curl_exec($ch);
@@ -531,7 +531,7 @@ class Client extends BaseController
         set_time_limit(0);
         $db = \Config\Database::connect();
         $dataKick = [];
-        $api_key = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
+        $api_key = (string) (getenv('HFM_API_KEY') ?: '');
         $members = $db->table('tb_member_vip')->where('status', 'aktif')->get()->getResultArray();
 
         foreach ($members as $m) {
@@ -540,7 +540,7 @@ class Client extends BaseController
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $api_key, 'Accept: application/json']);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
             $response = curl_exec($ch);
             $err = curl_error($ch);
@@ -704,7 +704,7 @@ class Client extends BaseController
         // Ambil semua data member yang ada di tabel
         $members = $db->table('tb_member_vip')->get()->getResultArray();
 
-        $api_key = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
+        $api_key = (string) (getenv('HFM_API_KEY') ?: '');
         $berhasil_diupdate = 0;
 
         foreach ($members as $m) {
@@ -718,7 +718,7 @@ class Client extends BaseController
                 'Authorization: Bearer ' . $api_key,
                 'Accept: application/json'
             ]);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
             $response = curl_exec($ch);
@@ -775,7 +775,7 @@ class Client extends BaseController
             ]);
         }
 
-        $api_key = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
+        $api_key = (string) (getenv('HFM_API_KEY') ?: '');
         $berhasil_diupdate = 0;
 
         foreach ($members as $m) {
@@ -789,7 +789,7 @@ class Client extends BaseController
                 'Authorization: Bearer ' . $api_key,
                 'Accept: application/json'
             ]);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
             $response = curl_exec($ch);

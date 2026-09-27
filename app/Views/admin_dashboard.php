@@ -212,6 +212,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="formEditMember">
+                <?= csrf_field() ?>
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label small fw-semibold text-muted">ID HFM (Bisa diedit)</label>
@@ -759,7 +760,7 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    token: 'Bonichi#2026'
+                    token: ''
                 })
             })
             .then(res => res.json()).then(data => {
@@ -782,7 +783,7 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    token: 'Bonichi#2026'
+                    token: ''
                 })
             })
             .then(res => res.json()).then(data => {

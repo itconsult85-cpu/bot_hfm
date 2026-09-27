@@ -119,6 +119,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
             <form id="phaseForm" method="post">
+                <?= csrf_field() ?>
                 <div class="modal-header border-0 pb-0">
                     <h5 class="fw-bold mb-0 modal-title"><i class="bi bi-envelope-paper text-primary me-2"></i>Fase Pengingat</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

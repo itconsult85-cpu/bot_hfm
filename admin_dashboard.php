@@ -583,7 +583,7 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    token: 'Bonichi#2026'
+                    token: ''
                 })
             })
             .then(res => res.json()).then(data => {
@@ -602,7 +602,7 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    token: 'Bonichi#2026'
+                    token: ''
                 })
             })
             .then(res => res.json()).then(data => {

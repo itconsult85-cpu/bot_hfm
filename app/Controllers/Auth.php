@@ -16,31 +16,40 @@ class Auth extends BaseController
 
     public function loginProcess()
     {
-        $model = new AdminModel();
-        $username = $this->request->getPost('username');
-        $password = $this->request->getPost('password');
-
-        $admin = $model->where('username', $username)->first();
-
-        if ($admin) {
-            if (password_verify($password, $admin['password'])) {
-                session()->set([
-                    'id'          => $admin['id'],
-                    'username'    => $admin['username'],
-                    'nama'        => $admin['nama_lengkap'],
-                    'isLoggedIn'  => true,
-                ]);
-                return redirect()->to(base_url('AdminDashboard'));
-            } else {
-                return redirect()->back()->with('error', 'Password salah.');
-            }
-        } else {
-            return redirect()->back()->with('error', 'Username tidak ditemukan.');
+        $session = session();
+        $now = time();
+        $attempts = array_values(array_filter(
+            (array) $session->get('login_attempts'),
+            static fn ($timestamp) => is_int($timestamp) && ($now - $timestamp) < 900
+        ));
+        if (count($attempts) >= 5) {
+            return redirect()->back()->with('error', 'Terlalu banyak percobaan login. Coba lagi dalam 15 menit.');
         }
+
+        $username = trim((string) $this->request->getPost('username'));
+        $password = (string) $this->request->getPost('password');
+        $admin = (new AdminModel())->where('username', $username)->first();
+
+        if (!$admin || !password_verify($password, (string) $admin['password'])) {
+            $attempts[] = $now;
+            $session->set('login_attempts', $attempts);
+            return redirect()->back()->with('error', 'Username atau password salah.');
+        }
+
+        $session->remove('login_attempts');
+        $session->regenerate(true);
+        $session->set([
+            'id'         => $admin['id'],
+            'username'   => $admin['username'],
+            'nama'       => $admin['nama_lengkap'],
+            'isLoggedIn' => true,
+        ]);
+        return redirect()->to(base_url('AdminDashboard'));
     }
 
     public function logout()
     {
+        session()->regenerate(true);
         session()->destroy();
         return redirect()->to(base_url('auth'));
     }

@@ -100,11 +100,17 @@ class BotGroupLink extends BaseController
             return redirect()->to('/bot-group-links')->with('error', 'Link WhatsApp dan konfigurasi Telegram aktif wajib tersedia.');
         }
 
+        $tokenRow = \Config\Database::connect()->table('bot_globals')->where('key_name', 'BOT_CONTROL_TOKEN')->get()->getRowArray();
+        $controlToken = trim((string) ($tokenRow['key_value'] ?? ''));
+        if ($controlToken === '') {
+            return redirect()->to('/bot-group-links')->with('error', 'BOT_CONTROL_TOKEN belum dikonfigurasi.');
+        }
+
         $ch = curl_init('http://127.0.0.1:3000/send-whatsapp-button');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Bot-Control-Token: ' . $controlToken],
             CURLOPT_POSTFIELDS => json_encode(['source_link_id' => (int) $id, 'telegram_group_id' => $telegram['group_id']]),
             CURLOPT_CONNECTTIMEOUT => 3,
             CURLOPT_TIMEOUT => 15,

@@ -6,7 +6,13 @@ use Config\Database;
 
 class ClientAcidCodeModification extends BaseController
 {
-    private string $apiKey = '127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e';
+    private string $apiKey = '';
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->apiKey = (string) (getenv('HFM_API_KEY') ?: '');
+    }
     private string $baseUrl = 'https://api.hfm-partners.com/api';
 
     public function index()

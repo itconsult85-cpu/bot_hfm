@@ -7,7 +7,13 @@ use CodeIgniter\Controller;
 
 class AdminDashboard extends BaseController
 {
-    private $apiKey = "127e07f2-3b2a-4cb5-9a5b-0610e4ecc86e";
+    private $apiKey = '';
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->apiKey = (string) (getenv('HFM_API_KEY') ?: '');
+    }
     private $baseUrl = "https://api.hfm-partners.com/api";
 
     private function postBotJson(string $path, array $payload): array
@@ -271,7 +277,7 @@ class AdminDashboard extends BaseController
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
         $response = curl_exec($ch);
@@ -341,7 +347,7 @@ class AdminDashboard extends BaseController
         curl_setopt($ch, CURLOPT_TIMEOUT, 60); // Waktu tunggu 60 detik
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
         $response = curl_exec($ch);
@@ -415,7 +421,7 @@ class AdminDashboard extends BaseController
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
         $response = curl_exec($ch);
@@ -495,7 +501,7 @@ class AdminDashboard extends BaseController
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
         $response = curl_exec($ch);
@@ -557,7 +563,7 @@ class AdminDashboard extends BaseController
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
         $response = curl_exec($ch);
@@ -628,7 +634,7 @@ class AdminDashboard extends BaseController
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_USERAGENT, 'BOSSCUAN/1.0');
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
         $response = curl_exec($ch);
