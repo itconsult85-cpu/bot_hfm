@@ -75,6 +75,9 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
 
     $routes->get('admin/member-logs', 'AdminDashboard::memberLogs');
     $routes->get('AdminDashboard/memberLogs', 'AdminDashboard::memberLogs');
+    $routes->get('admin/help-sessions', 'AdminDashboard::adminHelpSessions');
+    $routes->get('AdminDashboard/exportKickedMembers', 'AdminDashboard::exportKickedMembers');
+    $routes->post('AdminDashboard/kickLepasIbMembers', 'AdminDashboard::kickLepasIbMembers');
 
     $routes->group('bot-faq', function ($routes) {
         $routes->get('/', 'BotFaq::index');
@@ -105,8 +108,9 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
 
     $routes->group('user-progress', function ($routes) {
         $routes->get('/', 'UserProgress::index');
-        $routes->get('delete/(:any)', 'UserProgress::delete/$1');
+        $routes->post('reset', 'UserProgress::resetProgress');
     });
+    $routes->get('group-memberships', 'GroupMembership::index');
 
     $routes->group('chat-logs', function ($routes) {
         $routes->get('/', 'ChatLogTele::index');

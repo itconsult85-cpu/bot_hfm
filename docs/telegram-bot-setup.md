@@ -26,9 +26,17 @@ Struktur tabel tidak diubah oleh hardening ini. SQL tambahan hanya memastikan `B
 7. Bot membuat/mengambil link undangan Telegram dan menampilkan link grup WhatsApp aktif.
 8. Pesan, progres, timeout follow-up, dan media dicatat/dikelola sesuai tabel terkait.
 
+## Permintaan bantuan admin
+
+Saat user terkendala dan menekan tombol **Tolong saya admin** atau mengetik **tolong saya admin**, bot mengirim ringkasan satu kali kepada admin: identitas user, tahap kendala, keterangan terakhir user, dan hingga 10 foto terbaru yang tercatat. Bot tidak mengirim salinan seluruh riwayat chat dan tidak meneruskan pesan lanjutan. Tombol **Buka chat user** mengarahkan admin ke profil Telegram agar admin menghubungi user langsung; tidak ada perintah balas atau tutup sesi melalui bot.
+
+Daftar **Permintaan Bantuan Admin** pada dashboard CI4 dibaca dari `chat_logs_tele`, sehingga tidak bergantung pada API runtime Node dan tetap tersedia setelah bot di-restart. Permintaan baru masuk ke daftar setelah bot berhasil mengirim konfirmasi laporan dan mencatatnya ke database.
+
+Setelah status user tervalidasi dan undangan grup dikirim, keyboard bantuan dihapus. Pesan berikutnya hanya mendapat pemberitahuan bahwa akun sudah tervalidasi/terdaftar; status VIP diperiksa sebelum tombol bantuan ditawarkan sehingga user tervalidasi tidak masuk alur bantuan pendaftaran lagi.
+
 ## Konfigurasi server
 
-Salin `.env.example` menjadi `.env` untuk proses Node, kemudian isi `DB_*`, `CI_BASE_URL`, dan `HFM_API_KEY`. Jangan menyimpan nilai asli di Git atau dump SQL. `TELEGRAM_TOKEN`, `GEMINI_API_KEY`, dan `BOT_CONTROL_TOKEN` tetap dibaca dari `bot_globals`; semua secret lama yang pernah masuk source/dump harus dicabut dan dibuat ulang pada provider masing-masing.
+Untuk bot VPS, pertahankan konfigurasi yang sudah dipakai oleh baseline stabil. Jangan menambahkan loader yang memaksa bot membaca atau menimpa nilainya dari `.env` CI4. Konfigurasi CI4 dan proses bot dikelola terpisah; jangan menyalin isi rahasia `.env` ke Git, dump SQL, atau percakapan.
 
 Jalankan sekali. Jika memakai phpMyAdmin, pilih database CI4 pada panel kiri terlebih dahulu, lalu buka tab **SQL** dan jalankan seluruh isi file. Error MySQL `#1046 No database selected` berarti database belum dipilih.
 
@@ -38,7 +46,9 @@ npm ci --omit=dev
 npm start
 ```
 
-API kontrol Node hanya listen pada `127.0.0.1` dan memerlukan header `X-Bot-Control-Token`. CI4 mengambil token dari `bot_globals`, jadi tombol restart/report dan pengiriman tombol WhatsApp tidak lagi mengirim token yang tertanam di source.
+API kontrol Node di port `3000` memerlukan header `X-Bot-Control-Token`. Request pemeriksaan status VIP dari bot juga memakai token tersebut; HTTP `401` berarti token tidak terkirim atau nilainya tidak cocok. Samakan konfigurasi `BOT_CONTROL_TOKEN` yang dipakai proses bot dengan nilai di database CI4, tanpa membagikan tokennya.
+
+Di halaman **Progress Pendaftar Bot**, tombol **Reset** pada setiap baris mengembalikan progres ke Tahap 1 dan menghapus state sementara bot untuk user tersebut. Fitur ini tidak menghapus riwayat chat atau mengubah status VIP maupun keanggotaan grup.
 
 ## Catatan keamanan
 

@@ -51,7 +51,7 @@ class BotSchedule extends BaseController
     {
         // Menggunakan API internal Node.js di port 3000 untuk restart
         $db = Database::connect();
-        $tokenRow = $db->table('bot_globals')->where('key_name', 'BOT_CONTROL_TOKEN')->get()->getRowArray();
+        $tokenRow = $db->table('bot_globals')->where('key_name', 'BOT_CONTROL_TOKEN')->orderBy('id', 'DESC')->get()->getRowArray();
         $token = $tokenRow ? trim((string) $tokenRow['key_value']) : '';
 
         $ch = curl_init('http://127.0.0.1:3000/api/restart-bot');
@@ -86,6 +86,7 @@ class BotSchedule extends BaseController
         $tokenRow = Database::connect()->table('bot_globals')
             ->select('key_value')
             ->where('key_name', 'BOT_CONTROL_TOKEN')
+            ->orderBy('id', 'DESC')
             ->get()->getRowArray();
         $token = (string) ($tokenRow['key_value'] ?? '');
         if ($token === '') {

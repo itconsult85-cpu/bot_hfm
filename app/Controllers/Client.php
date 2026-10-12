@@ -42,6 +42,13 @@ class Client extends BaseController
 
     public function apiGroupLinks()
     {
+        if (!$this->hasValidBotControlToken()) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ]);
+        }
+
         $db = \Config\Database::connect();
         $links = $db->table('bot_group_links')
             ->select('id, platform, group_name, invite_link, group_id')
@@ -59,25 +66,41 @@ class Client extends BaseController
 
     public function apiWhatsAppGroupJoin()
     {
+        if (!$this->hasValidBotControlToken()) {
+            return $this->response->setStatusCode(401)->setJSON(['status' => 'error', 'pesan' => 'Unauthorized.']);
+        }
+
         $payload = $this->request->getJSON(true) ?: $this->request->getPost();
         $whatsappId = trim((string) ($payload['whatsapp_id'] ?? ''));
         $phone = preg_replace('/\D+/', '', (string) ($payload['phone_number'] ?? $whatsappId));
         $groupId = trim((string) ($payload['group_id'] ?? ''));
         $displayName = trim((string) ($payload['display_name'] ?? ''));
+        $event = strtolower(trim((string) ($payload['event'] ?? 'join')));
         if ($whatsappId === '' || $groupId === '') return $this->response->setStatusCode(422)->setJSON(['status' => 'error', 'pesan' => 'whatsapp_id dan group_id wajib diisi.']);
+        if (!in_array($event, ['join', 'joined', 'leave', 'left', 'member_left'], true)) return $this->response->setStatusCode(422)->setJSON(['status' => 'error', 'pesan' => 'event harus join atau left.']);
+        $status = in_array($event, ['leave', 'left', 'member_left'], true) ? 'left' : 'active';
 
         $canonical = static function (string $value): string {
             $digits = preg_replace('/\D+/', '', $value);
             return str_starts_with($digits, '0') ? '62' . substr($digits, 1) : $digits;
         };
         $db = \Config\Database::connect();
+        $group = $db->table('bot_group_links')
+            ->where('platform', 'whatsapp')
+            ->where('group_id', $groupId)
+            ->get()->getRowArray();
+        if (!$group) return $this->response->setStatusCode(422)->setJSON(['status' => 'error', 'pesan' => 'group_id tidak cocok dengan konfigurasi WhatsApp dashboard.']);
+
+        $knownMember = false;
         $members = $db->table('tb_member_vip')->select('no_wa')->get()->getResultArray();
         foreach ($members as $member) {
-            if ($canonical((string) $member['no_wa']) === $canonical($phone)) {
-                return $this->response->setJSON(['status' => 'known_member', 'pesan' => 'Member sudah ada di tb_member_vip; tidak dicatat ulang.']);
+            if ($phone !== '' && $canonical((string) $member['no_wa']) === $canonical($phone)) {
+                $knownMember = true;
+                break;
             }
         }
 
+        $now = date('Y-m-d H:i:s');
         $existing = $db->table('whatsapp_group_members')
             ->where('whatsapp_id', $whatsappId)
             ->where('group_id', $groupId)
@@ -86,21 +109,28 @@ class Client extends BaseController
             $db->table('whatsapp_group_members')->where('id', $existing['id'])->update([
                 'phone_number' => $phone,
                 'display_name' => $displayName,
-                'status' => 'active',
-                'left_at' => null,
-                'updated_at' => date('Y-m-d H:i:s'),
+                'status' => $status,
+                'joined_at' => $status === 'active' ? $now : $existing['joined_at'],
+                'left_at' => $status === 'left' ? $now : null,
+                'updated_at' => $now,
             ]);
-            return $this->response->setJSON(['status' => 'already_recorded', 'pesan' => 'Member sudah pernah dicatat; data diaktifkan kembali.']);
+        } else {
+            $db->table('whatsapp_group_members')->insert([
+                'whatsapp_id' => $whatsappId,
+                'phone_number' => $phone,
+                'display_name' => $displayName,
+                'group_id' => $groupId,
+                'status' => $status,
+                'joined_at' => $now,
+                'left_at' => $status === 'left' ? $now : null,
+            ]);
         }
-        $db->table('whatsapp_group_members')->insert([
-            'whatsapp_id' => $whatsappId,
-            'phone_number' => $phone,
-            'display_name' => $displayName,
-            'group_id' => $groupId,
-            'status' => 'active',
-            'joined_at' => date('Y-m-d H:i:s'),
+
+        return $this->response->setJSON([
+            'status' => $knownMember ? 'known_member_recorded' : 'event_recorded',
+            'membership_status' => $status,
+            'pesan' => $status === 'active' ? 'Event masuk grup WhatsApp berhasil dicatat.' : 'Event keluar grup WhatsApp berhasil dicatat.',
         ]);
-        return $this->response->setJSON(['status' => 'new_member', 'pesan' => 'Member WhatsApp baru berhasil dicatat.']);
     }
 
     public function apiLaporanHarian()
@@ -261,6 +291,13 @@ class Client extends BaseController
 
     public function check_status_vip($no_wa)
     {
+        if (!$this->hasValidBotControlToken()) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ]);
+        }
+
         $db = \Config\Database::connect();
 
         // Pengecekan via Telegram ID atau Nomor WA
@@ -278,6 +315,56 @@ class Client extends BaseController
         return $this->response->setJSON(['is_vip' => false]);
     }
 
+    private function hasValidBotControlToken(): bool
+    {
+        $db = \Config\Database::connect();
+        $tokenRow = $db->table('bot_globals')
+            ->select('key_value')
+            ->where('key_name', 'BOT_CONTROL_TOKEN')
+            ->orderBy('id', 'DESC')
+            ->get()->getRowArray();
+        $expectedToken = trim((string) ($tokenRow['key_value'] ?? ''));
+        $providedToken = trim($this->request->getHeaderLine('X-Bot-Control-Token'));
+
+        return $expectedToken !== ''
+            && $providedToken !== ''
+            && hash_equals($expectedToken, $providedToken);
+    }
+
+    private function fetchHfmClientReport(string $idHfm): ?array
+    {
+        $apiKey = (string) (getenv('HFM_API_KEY') ?: '');
+        if ($apiKey === '') return null;
+
+        $ch = curl_init('https://api.hfm-partners.com/api/clients/' . rawurlencode($idHfm) . '/report');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $apiKey, 'Accept: application/json'],
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_USERAGENT => 'BOSSCUAN-HFM-Client/1.0',
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($response === false || $httpCode !== 200) return null;
+
+        $rawData = json_decode($response, true);
+        if (!is_array($rawData)) return null;
+        if (isset($rawData[0]) && is_array($rawData[0])) {
+            $data = $rawData[0];
+        } elseif (isset($rawData['data'][0]) && is_array($rawData['data'][0])) {
+            $data = $rawData['data'][0];
+        } elseif (isset($rawData['data']) && is_array($rawData['data'])) {
+            $data = $rawData['data'];
+        } else {
+            $data = $rawData;
+        }
+
+        return !empty($data['id']) ? $data : null;
+    }
+
     public function cekHfm($id_hfm, $no_wa = null)
     {
         if ($no_wa === null) {
@@ -291,6 +378,22 @@ class Client extends BaseController
         if ($cek_db) {
             $db_wa = $cek_db['no_wa'];
             if ($db_wa == $no_wa) {
+                $campaignColumnExists = array_key_exists('campaign', $cek_db);
+                if (empty($cek_db['email']) || ($campaignColumnExists && empty($cek_db['campaign']))) {
+                    $hfmData = $this->fetchHfmClientReport((string) $id_hfm);
+                    if ($hfmData) {
+                        $metadata = [];
+                        if (empty($cek_db['email']) && !empty($hfmData['email'])) {
+                            $metadata['email'] = trim((string) $hfmData['email']);
+                        }
+                        if ($campaignColumnExists && empty($cek_db['campaign']) && !empty($hfmData['campaign'])) {
+                            $metadata['campaign'] = trim((string) $hfmData['campaign']);
+                        }
+                        if ($metadata) {
+                            $db->table('tb_member_vip')->where('id', $cek_db['id'])->update($metadata);
+                        }
+                    }
+                }
                 return $this->response->setJSON(['status' => 'valid_sempurna', 'pesan' => 'ID sudah terdaftar atas nama Kakak.']);
             } else {
                 $awal = substr($db_wa, 0, 4);
@@ -348,6 +451,8 @@ class Client extends BaseController
         $equity        = (float) ($data['equity'] ?? 0);
         $deposit = max($deposit_murni, $balance, $equity);
         $nama = $data['name'] ?? 'Member BOSSCUAN';
+        $emailHfm = trim((string) ($data['email'] ?? ''));
+        $campaignHfm = trim((string) ($data['campaign'] ?? ''));
 
         $last_trade = null;
         $raw_last_trade = $data['last_trade'] ?? 'N/A';
@@ -385,17 +490,21 @@ class Client extends BaseController
                 ->getRowArray();
 
             if ($memberLepasIb) {
-                $db->table('tb_member_vip')->where('id', $memberLepasIb['id'])->update([
+                $updateMember = [
                     'id_hfm'     => $id_hfm,
                     'status'     => 'aktif',
                     'nama'       => $nama,
                     'deposit'    => $deposit,
                     'updated_at' => date('Y-m-d H:i:s')
-                ]);
+                ];
+                if ($emailHfm !== '') $updateMember['email'] = $emailHfm;
+                if ($campaignHfm !== '') $updateMember['campaign'] = $campaignHfm;
+                $db->table('tb_member_vip')->where('id', $memberLepasIb['id'])->update($updateMember);
                 $db->table('tb_member_logs')->insert([
                     'no_wa'          => $no_wa,
                     'nama'           => $nama,
                     'id_hfm'         => $id_hfm,
+                    'id_telegram'    => $memberLepasIb['id_telegram'] ?? null,
                     'tipe_aktivitas' => 'aktif_kembali'
                 ]);
             } else {
@@ -403,6 +512,8 @@ class Client extends BaseController
                     'id_hfm'     => $id_hfm,
                     'no_wa'      => $no_wa,
                     'nama'       => $nama,
+                    'email'      => $emailHfm !== '' ? $emailHfm : null,
+                    'campaign'   => $campaignHfm !== '' ? $campaignHfm : null,
                     'deposit'    => $deposit,
                     'currency'   => $currency,
                     'status'     => 'aktif',
@@ -432,7 +543,9 @@ class Client extends BaseController
         $id_hfm = $json->id_hfm ?? '';
         $no_wa = $json->no_wa ?? '';
         $nama_form = $json->nama ?? ''; // Nama dari inputan form user
-        $email = $json->email ?? '';
+        $email = trim((string) ($json->email ?? ''));
+        $emailReal = $email;
+        $campaignReal = null;
         $id_telegram = $json->id_telegram ?? '';
         $registrationSource = trim((string) ($json->registration_source ?? '')) ?: null;
         $registrationSourceId = !empty($json->registration_source_id) ? (int) $json->registration_source_id : null;
@@ -473,10 +586,24 @@ class Client extends BaseController
 
         // 3. PROSES JSON DARI HFM
         if ($response) {
-            $dataApi = json_decode($response, true);
+            $rawData = json_decode($response, true);
+            $dataApi = [];
+            if (isset($rawData[0]) && is_array($rawData[0])) {
+                $dataApi = $rawData[0];
+            } elseif (isset($rawData['data'][0]) && is_array($rawData['data'][0])) {
+                $dataApi = $rawData['data'][0];
+            } elseif (isset($rawData['data']) && is_array($rawData['data'])) {
+                $dataApi = $rawData['data'];
+            } elseif (is_array($rawData)) {
+                $dataApi = $rawData;
+            }
 
             // Mengekstrak data dari format objek tunggal HFM
             if (isset($dataApi['id'])) {
+                $apiEmail = trim((string) ($dataApi['email'] ?? ''));
+                if ($apiEmail !== '') $emailReal = $apiEmail;
+                $apiCampaign = trim((string) ($dataApi['campaign'] ?? ''));
+                $campaignReal = $apiCampaign !== '' ? $apiCampaign : null;
 
                 // Kalkulasi deposit: Ambil nilai tertinggi antara deposits, balance, atau equity
                 $depo   = (float)($dataApi['deposits'] ?? 0);
@@ -505,7 +632,8 @@ class Client extends BaseController
             'id_hfm'      => $id_hfm,
             'no_wa'       => $no_wa,
             'nama'        => $nama_real,
-            'email'       => $email,
+            'email'       => $emailReal !== '' ? $emailReal : null,
+            'campaign'    => $campaignReal,
             'id_telegram' => $id_telegram,
             'registration_source' => $registrationSource,
             'registration_source_id' => $registrationSourceId,
@@ -520,6 +648,7 @@ class Client extends BaseController
             'no_wa'          => $no_wa,
             'nama'           => $nama_real,
             'id_hfm'         => $id_hfm,
+            'id_telegram'    => $id_telegram,
             'tipe_aktivitas' => 'masuk_via_form'
         ]);
 
@@ -549,7 +678,13 @@ class Client extends BaseController
             if (!$err && $response) {
                 $data = json_decode($response, true);
                 if (!isset($data['id']) || $data['id'] == null) {
-                    $db->table('tb_member_logs')->insert(['no_wa' => $m['no_wa'], 'nama' => $m['nama'], 'tipe_aktivitas' => 'lepas_ib']);
+                    $db->table('tb_member_logs')->insert([
+                        'no_wa'          => $m['no_wa'],
+                        'nama'           => $m['nama'],
+                        'id_hfm'         => $m['id_hfm'],
+                        'id_telegram'    => $m['id_telegram'] ?? null,
+                        'tipe_aktivitas' => 'lepas_ib',
+                    ]);
                     $dataKick[] = ['no_wa' => $m['no_wa'], 'nama'  => $m['nama'] ?? 'Kak'];
                     $db->table('tb_member_vip')->where('id_hfm', $id_hfm)->update(['status' => 'lepas_ib']);
                 }

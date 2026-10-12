@@ -100,7 +100,7 @@ class BotGroupLink extends BaseController
             return redirect()->to('/bot-group-links')->with('error', 'Link WhatsApp dan konfigurasi Telegram aktif wajib tersedia.');
         }
 
-        $tokenRow = \Config\Database::connect()->table('bot_globals')->where('key_name', 'BOT_CONTROL_TOKEN')->get()->getRowArray();
++        $tokenRow = \Config\Database::connect()->table('bot_globals')->where('key_name', 'BOT_CONTROL_TOKEN')->orderBy('id', 'DESC')->get()->getRowArray();
         $controlToken = trim((string) ($tokenRow['key_value'] ?? ''));
         if ($controlToken === '') {
             return redirect()->to('/bot-group-links')->with('error', 'BOT_CONTROL_TOKEN belum dikonfigurasi.');
@@ -151,8 +151,11 @@ class BotGroupLink extends BaseController
         if ($groupName === '' || strlen($groupName) > 150) {
             $errors[] = 'Nama grup wajib diisi dan maksimal 150 karakter.';
         }
-        if (!filter_var($inviteLink, FILTER_VALIDATE_URL) || !preg_match('/^https:\/\//i', $inviteLink)) {
-            $errors[] = 'Link grup harus berupa URL HTTPS yang valid.';
+        if ($platform === 'whatsapp' && (!filter_var($inviteLink, FILTER_VALIDATE_URL) || !preg_match('/^https:\/\//i', $inviteLink))) {
+            $errors[] = 'Link grup WhatsApp harus berupa URL HTTPS yang valid.';
+        }
+        if ($platform === 'telegram' && $inviteLink !== '' && (!filter_var($inviteLink, FILTER_VALIDATE_URL) || !preg_match('/^https:\/\//i', $inviteLink))) {
+            $errors[] = 'Jika diisi, link grup Telegram harus berupa URL HTTPS yang valid. Kosongkan agar bot membuat link sementara otomatis.';
         }
         if ($platform === 'telegram' && $groupId === '') {
             $errors[] = 'ID grup Telegram wajib diisi agar bot dapat melakukan kick.';

@@ -1,0 +1,8 @@
+In-app Browser JS state was preserved. Completed actions were not rolled back; refresh stale UI handles and continue only the remaining work.
+{"code":"SNAPSHOT_TOO_LARGE","method":"browser_snapshot","callIndex":2,"nextAction":"inspect_before_retry"}
+ERROR SNAPSHOT_TOO_LARGE
+{"control":{"documentRevision":"rev_8724a858-2a2f-4bca-a124-e08bfb293620","error":{"code":"SNAPSHOT_TOO_LARGE","retryable":false},"requiresSnapshot":false,"status":"error","tabId":"tab_8f97374c-1060-4412-8550-38c4a76a19b7"},"kind":"error","schema":"manus.browser/v1","warnings":["Browser snapshot has 50001 nodes, exceeding the 50000-node safety budget."]}
+ERROR STALE_PAGE
+{"control":{"documentRevision":"rev_8724a858-2a2f-4bca-a124-e08bfb293620","error":{"code":"STALE_PAGE","retryable":true},"requiresSnapshot":true,"status":"error","tabId":"tab_8f97374c-1060-4412-8550-38c4a76a19b7"},"kind":"error","schema":"manus.browser/v1"}
+ERROR SNAPSHOT_TOO_LARGE
+{"control":{"documentRevision":"rev_8724a858-2a2f-4bca-a124-e08bfb293620","error":{"code":"SNAPSHOT_TOO_LARGE","retryable":false},"requiresSnapshot":false,"status":"error","tabId":"tab_8f97374c-1060-4412-8550-38c4a76a19b7"},"kind":"error","schema":"manus.browser/v1","warnings":["Browser snapshot has 50001 nodes, exceeding the 50000-node safety budget."]}

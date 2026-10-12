@@ -61,6 +61,17 @@ class ActivityReminder extends BaseController
         ];
         if ($this->hasMemberLogTelegramColumn($db)) {
             $logData['id_telegram'] = $member['id_telegram'] ?? null;
+            $telegramId = trim((string) ($member['id_telegram'] ?? ''));
+            if ($telegramId !== '' && $telegramId !== '-') {
+                $db->table('tb_member_logs')
+                    ->where('id_hfm', $member['id_hfm'])
+                    ->groupStart()
+                    ->where('id_telegram IS NULL', null, false)
+                    ->orWhere('id_telegram', '')
+                    ->orWhere('id_telegram', '-')
+                    ->groupEnd()
+                    ->update(['id_telegram' => $telegramId]);
+            }
         }
         $db->table('tb_member_logs')->insert($logData);
         $db->table('tb_member_vip')->where('id', (int) $id)->delete();
@@ -76,12 +87,21 @@ class ActivityReminder extends BaseController
 
     private function postBot(string $path, array $payload): void
     {
+        $db = Database::connect();
+        $tokenRow = $db->table('bot_globals')->select('key_value')
+            ->where('key_name', 'BOT_CONTROL_TOKEN')->orderBy('id', 'DESC')->get()->getRowArray();
+        $token = trim((string) ($tokenRow['key_value'] ?? ''));
+        if ($token === '') {
+            log_message('error', 'BOT_CONTROL_TOKEN belum dikonfigurasi untuk request kick bot.');
+            return;
+        }
+
         $ch = curl_init('http://127.0.0.1:3000' . $path);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Bot-Control-Token: ' . $token],
+            CURLOPT_POSTFIELDS => json_encode($payload + ['token' => $token]),
             CURLOPT_TIMEOUT => 5,
         ]);
         curl_exec($ch);

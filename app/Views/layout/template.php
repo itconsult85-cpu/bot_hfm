@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard.css') ?>?v=<?= filemtime(FCPATH . 'assets/css/dashboard.css') ?>">
 
     <style>
         body {
@@ -24,12 +24,14 @@
         .sidebar-menu-link {
             display: flex;
             align-items: center;
-            padding: 12px 20px;
+            padding: 7px 16px;
             color: #475569;
             text-decoration: none;
+            font-size: 0.9rem;
+            line-height: 1.2;
             font-weight: 600;
             border-radius: 10px;
-            margin: 4px 12px;
+            margin: 2px 10px;
             transition: all 0.2s ease;
         }
 
@@ -40,23 +42,24 @@
         }
 
         .sidebar-menu-link i {
-            font-size: 1.1rem;
-            width: 30px;
+            font-size: 1rem;
+            width: 26px;
         }
 
         .submenu-container {
             background-color: #f8fafc;
             border-radius: 10px;
-            margin: 0 12px;
-            padding: 8px 0;
+            margin: 0 10px;
+            padding: 4px 0;
         }
 
         .submenu-link {
             display: block;
-            padding: 8px 20px 8px 50px;
+            padding: 5px 12px 5px 40px;
             color: #64748b;
             text-decoration: none;
-            font-size: 0.9rem;
+            font-size: 0.82rem;
+            line-height: 1.2;
             font-weight: 500;
             transition: color 0.2s;
         }
@@ -67,11 +70,12 @@
         }
 
         .menu-title {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
+            line-height: 1.2;
             text-transform: uppercase;
             color: #94a3b8;
             font-weight: 700;
-            padding: 16px 20px 8px;
+            padding: 9px 16px 4px;
         }
 
         ::-webkit-scrollbar {

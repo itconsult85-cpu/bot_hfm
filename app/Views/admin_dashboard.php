@@ -6,7 +6,10 @@
         <h3 class="fw-bold tracking-tight mb-1">Overview Realtime</h3>
         <p class="text-muted small mb-0">Pantau performa pendaftaran dan aktivitas grup VIP Anda.</p>
     </div>
-    <div>
+    <div class="d-flex flex-column flex-sm-row gap-2">
+        <button type="button" class="btn btn-warning rounded-pill px-4 fw-semibold shadow-sm" onclick="restartTelegramBot()">
+            <i class="bi bi-arrow-clockwise me-2"></i>Restart Bot Telegram
+        </button>
         <a href="<?= base_url('AdminDashboard/backupDatabase') ?>" class="btn btn-outline-dark rounded-pill px-4 fw-semibold shadow-sm">
             <i class="bi bi-database-down me-2"></i>Backup Database
         </a>
@@ -84,7 +87,7 @@
             <option value="USC">USC</option>
             <option value="IDR">IDR</option>
         </select>
-        <input type="text" id="searchInput" class="form-control rounded-pill px-4" placeholder="Cari Nama, ID, WA, atau Tele..." style="min-width: 250px;">
+        <input type="text" id="searchInput" class="form-control rounded-pill px-4" placeholder="Cari Nama, ID, WA, Tele, email, campaign..." style="min-width: 250px;">
         <button class="btn btn-primary rounded-pill px-4 fw-semibold shadow-sm text-nowrap" onclick="syncSemua()" id="btnSyncSemua">
             <i class="bi bi-cloud-arrow-down-fill me-2"></i> Sync Semua
         </button>
@@ -99,12 +102,14 @@
             data-idhfm="<?= esc($m['id_hfm']) ?>"
             data-nowa="<?= esc($m['no_wa']) ?>"
             data-idtelegram="<?= strtolower(esc($m['id_telegram'] ?? '')) ?>"
+            data-email="<?= esc(strtolower((string) ($m['email'] ?? ''))) ?>"
+            data-campaign="<?= esc(strtolower((string) ($m['campaign'] ?? ''))) ?>"
             data-status="<?= esc($m['status']) ?>"
             data-currency="<?= esc($m['currency'] ?? 'USD') ?>">
             <div class="card data-card p-3">
-                <div class="row align-items-start align-items-md-center g-3">
+                <div class="member-data-grid">
 
-                    <div class="col-md col-12 d-flex align-items-start align-items-md-center">
+                    <div class="member-data-identity d-flex align-items-start align-items-md-center">
 
                         <div class="fw-bold text-muted text-end me-2 me-md-3 mt-1 mt-md-0">
                             <?= $no++ ?>.
@@ -139,14 +144,19 @@
                         </div>
                     </div>
 
-                    <div class="col-6 col-md-2">
+                    <div class="member-data-field member-data-email">
+                        <p class="text-muted small mb-0">Email</p>
+                        <span class="small text-break" id="email-<?= esc($m['id_hfm']) ?>"><?= esc(($m['email'] ?? '') ?: '-') ?></span>
+                    </div>
+
+                    <div class="member-data-field member-data-deposit">
                         <p class="text-muted small mb-0">Deposit</p>
                         <span class="fw-bold text-dark" id="depo-<?= $m['id_hfm'] ?>">
                             <?= esc($m['currency'] ?? 'USD') ?> <?= number_format($m['deposit'], 2) ?>
                         </span>
                     </div>
 
-                    <div class="col-6 col-md-2">
+                    <div class="member-data-field member-data-trade">
                         <p class="text-muted small mb-0">Terakhir Trading</p>
                         <span id="trade-<?= $m['id_hfm'] ?>" class="d-inline-block mt-1">
                             <?php if (empty($m['last_trade']) || $m['last_trade'] === '0000-00-00 00:00:00'): ?>
@@ -159,7 +169,7 @@
                         </span>
                     </div>
 
-                    <div class="col-12 col-md-2 mt-3 mt-md-0 text-center text-md-start">
+                    <div class="member-data-field member-data-status">
                         <p class="text-muted small mb-0">Status IB</p>
                         <span id="status-<?= $m['id_hfm'] ?>" class="d-inline-block mt-1">
                             <?php if ($m['status'] == 'aktif'): ?>
@@ -170,8 +180,14 @@
                         </span>
                     </div>
 
-                    <div class="col-12 col-md-auto d-flex justify-content-center justify-content-md-end align-items-center flex-wrap gap-2 mt-3 mt-md-0">
-                        <button class="btn btn-outline-warning btn-sm rounded-pill px-3 fw-semibold btn-edit"
+                    <div class="member-data-field member-data-campaign">
+                        <p class="text-muted small mb-0">Campaign</p>
+                        <span class="small text-break" id="campaign-<?= esc($m['id_hfm']) ?>"><?= esc(($m['campaign'] ?? '') ?: '-') ?></span>
+                    </div>
+                </div>
+
+                <div class="member-data-actions">
+                    <button class="btn btn-outline-warning btn-sm rounded-pill px-3 fw-semibold btn-edit"
                             data-id="<?= esc($m['id_hfm']) ?>"
                             data-wa="<?= esc($m['no_wa']) ?>"
                             data-currency="<?= esc($m['currency'] ?? 'USD') ?>"
@@ -179,18 +195,17 @@
                             data-status="<?= esc($m['status']) ?>"
                             data-trade="<?= esc($m['last_trade']) ?>">
                             <i class="bi bi-pencil-square me-1"></i> Edit
-                        </button>
+                    </button>
 
-                        <button class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold btn-sync-single" onclick="syncData(this, '<?= $m['id_hfm'] ?>')">
-                            <i class="bi bi-arrow-repeat me-1"></i> Cek API
-                        </button>
+                    <button class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold btn-sync-single" onclick="syncData(this, '<?= $m['id_hfm'] ?>')">
+                        <i class="bi bi-arrow-repeat me-1"></i> Cek API
+                    </button>
 
-                        <button class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-semibold btn-hapus"
-                            data-id="<?= esc($m['id_hfm']) ?>" data-nama="<?= esc($m['nama'] ?? 'Member BOSSCUAN') ?>"
-                            data-bs-toggle="modal" data-bs-target="#modalHapus">
-                            <i class="bi bi-trash3 me-1"></i> Hapus
-                        </button>
-                    </div>
+                    <button class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-semibold btn-hapus"
+                        data-id="<?= esc($m['id_hfm']) ?>" data-nama="<?= esc($m['nama'] ?? 'Member BOSSCUAN') ?>"
+                        data-bs-toggle="modal" data-bs-target="#modalHapus">
+                        <i class="bi bi-trash3 me-1"></i> Hapus
+                    </button>
                 </div>
             </div>
         </div>
@@ -199,7 +214,7 @@
 
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4">
     <span class="text-muted small mb-2 mb-md-0" id="pageInfo">Menampilkan 0 data</span>
-    <nav>
+    <nav aria-label="Navigasi halaman data member">
         <ul class="pagination pagination-sm mb-0 flex-wrap" id="paginationControls"></ul>
     </nav>
 </div>
@@ -367,6 +382,15 @@
                     if (elemNama) elemNama.innerText = res.data.nama;
                 }
 
+                if (Object.prototype.hasOwnProperty.call(res.data, 'email')) {
+                    const emailEl = document.getElementById('email-' + id_hfm);
+                    if (emailEl) emailEl.innerText = res.data.email || '-';
+                }
+                if (Object.prototype.hasOwnProperty.call(res.data, 'campaign')) {
+                    const campaignEl = document.getElementById('campaign-' + id_hfm);
+                    if (campaignEl) campaignEl.innerText = res.data.campaign || '-';
+                }
+
                 let rawTrade = res.data.last_trade;
                 let tradeEl = document.getElementById('trade-' + id_hfm);
                 if (tradeEl) {
@@ -386,14 +410,19 @@
                 if (statusEl) statusEl.innerHTML = '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2 small fw-semibold">Aktif</span>';
 
                 const row = document.querySelector(`.member-item[data-idhfm="${id_hfm}"]`);
-                if (row) row.setAttribute('data-status', 'aktif');
+                if (row) {
+                    row.setAttribute('data-status', 'aktif');
+                    if (Object.prototype.hasOwnProperty.call(res.data, 'email')) row.setAttribute('data-email', String(res.data.email || '').toLowerCase());
+                    if (Object.prototype.hasOwnProperty.call(res.data, 'campaign')) row.setAttribute('data-campaign', String(res.data.campaign || '').toLowerCase());
+                }
 
             } else if (res.status === 'lepas_ib') {
-                let statusEl = document.getElementById('status-' + id_hfm);
-                if (statusEl) statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-2 small fw-semibold">Lepas IB</span>';
-
                 const row = document.querySelector(`.member-item[data-idhfm="${id_hfm}"]`);
-                if (row) row.setAttribute('data-status', 'lepas_ib');
+                const statusEl = document.getElementById('status-' + id_hfm);
+                if (statusEl) statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-2 small fw-semibold">Lepas IB</span>';
+                if (row) {
+                    row.setAttribute('data-status', 'lepas_ib');
+                }
 
             } else {
                 alert("Gagal Sync: " + (res.pesan || "Terjadi kesalahan sistem"));
@@ -455,7 +484,7 @@
     document.addEventListener("DOMContentLoaded", function() {
         const itemsPerPage = 100;
         let currentPage = 1;
-        const allItems = Array.from(document.querySelectorAll('.member-item'));
+        let allItems = Array.from(document.querySelectorAll('.member-item'));
         let filteredItems = [...allItems];
         window.getFilteredItems = () => filteredItems;
         const paginationControls = document.getElementById('paginationControls');
@@ -490,7 +519,9 @@
 
             const prevLi = document.createElement('li');
             prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-            prevLi.innerHTML = `<a class="page-link shadow-sm rounded-start-pill" href="#">&laquo;</a>`;
+            prevLi.innerHTML = currentPage === 1 ?
+                `<span class="page-link shadow-sm rounded-start-pill" aria-hidden="true">&laquo;</span>` :
+                `<a class="page-link shadow-sm rounded-start-pill" href="#" aria-label="Halaman sebelumnya">&laquo;</a>`;
             prevLi.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (currentPage > 1) renderPage(currentPage - 1);
@@ -508,7 +539,7 @@
             if (startPage > 1) {
                 const firstLi = document.createElement('li');
                 firstLi.className = `page-item`;
-                firstLi.innerHTML = `<a class="page-link shadow-sm" href="#">1</a>`;
+                firstLi.innerHTML = `<a class="page-link shadow-sm" href="#" aria-label="Halaman pertama">1</a>`;
                 firstLi.addEventListener('click', (e) => {
                     e.preventDefault();
                     renderPage(1);
@@ -526,7 +557,7 @@
             for (let i = startPage; i <= endPage; i++) {
                 const li = document.createElement('li');
                 li.className = `page-item ${i === currentPage ? 'active' : ''}`;
-                li.innerHTML = `<a class="page-link shadow-sm" href="#">${i}</a>`;
+                li.innerHTML = `<a class="page-link shadow-sm" href="#" ${i === currentPage ? 'aria-current="page"' : ''}>${i}</a>`;
                 li.addEventListener('click', (e) => {
                     e.preventDefault();
                     renderPage(i);
@@ -543,7 +574,7 @@
                 }
                 const lastLi = document.createElement('li');
                 lastLi.className = `page-item`;
-                lastLi.innerHTML = `<a class="page-link shadow-sm" href="#">${totalPages}</a>`;
+                lastLi.innerHTML = `<a class="page-link shadow-sm" href="#" aria-label="Halaman terakhir">${totalPages}</a>`;
                 lastLi.addEventListener('click', (e) => {
                     e.preventDefault();
                     renderPage(totalPages);
@@ -553,7 +584,9 @@
 
             const nextLi = document.createElement('li');
             nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-            nextLi.innerHTML = `<a class="page-link shadow-sm rounded-end-pill" href="#">&raquo;</a>`;
+            nextLi.innerHTML = currentPage === totalPages ?
+                `<span class="page-link shadow-sm rounded-end-pill" aria-hidden="true">&raquo;</span>` :
+                `<a class="page-link shadow-sm rounded-end-pill" href="#" aria-label="Halaman berikutnya">&raquo;</a>`;
             nextLi.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (currentPage < totalPages) renderPage(currentPage + 1);
@@ -575,10 +608,12 @@
                 const idhfm = item.getAttribute('data-idhfm') || '';
                 const nowa = item.getAttribute('data-nowa') || '';
                 const telegram = item.getAttribute('data-idtelegram') || '';
+                const email = item.getAttribute('data-email') || '';
+                const campaign = item.getAttribute('data-campaign') || '';
                 const status = (item.getAttribute('data-status') || '').toLowerCase();
                 const currency = (item.getAttribute('data-currency') || '').toLowerCase();
 
-                const matchText = nama.includes(keyword) || idhfm.includes(keyword) || nowa.includes(keyword) || telegram.includes(keyword);
+                const matchText = nama.includes(keyword) || idhfm.includes(keyword) || nowa.includes(keyword) || telegram.includes(keyword) || email.includes(keyword) || campaign.includes(keyword);
                 const matchStatus = statusVal === '' || status === statusVal;
                 const matchCurrency = currencyVal === '' || currency === currencyVal;
 
@@ -769,6 +804,40 @@
                 if (modal) modal.hide();
             })
             .catch(err => alert('Gagal menghubungi server: ' + err.message));
+    }
+
+    async function restartTelegramBot() {
+        const approved = await showAppConfirm('Restart proses PM2 bot_tele_hfm sekarang? Bot akan berhenti sebentar lalu dijalankan kembali oleh PM2.', {
+            title: 'Restart bot Telegram',
+            confirmText: 'Restart sekarang'
+        });
+        if (!approved) return;
+
+        try {
+            const response = await fetch('<?= base_url('bot-schedules/restart-bot') ?>', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    '<?= csrf_header() ?>': '<?= csrf_hash() ?>',
+                    'Accept': 'application/json'
+                }
+            });
+            const raw = await response.text();
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch (_) {
+                data = { error: raw.substring(0, 500) };
+            }
+            if (!response.ok) {
+                const detail = data.detail ? `\nDetail: ${data.detail}` : '';
+                throw new Error((data.error || `HTTP ${response.status}`) + detail);
+            }
+            await showAppAlert(data.message || 'Permintaan restart bot Telegram berhasil dikirim.');
+        } catch (error) {
+            await showAppAlert('Restart bot Telegram gagal: ' + error.message);
+        }
     }
 
     async function resetSesi() {

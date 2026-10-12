@@ -17,12 +17,20 @@ class AdminDashboard extends BaseController
 
     private function postBotJson(string $path, array $payload): array
     {
+        $db = \Config\Database::connect();
+        $tokenRow = $db->table('bot_globals')->select('key_value')
+            ->where('key_name', 'BOT_CONTROL_TOKEN')->orderBy('id', 'DESC')->get()->getRowArray();
+        $token = trim((string) ($tokenRow['key_value'] ?? ''));
+        if ($token === '') {
+            return ['ok' => false, 'message' => 'BOT_CONTROL_TOKEN belum dikonfigurasi.'];
+        }
+
         $ch = curl_init('http://127.0.0.1:3000' . $path);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Bot-Control-Token: ' . $token],
+            CURLOPT_POSTFIELDS => json_encode($payload + ['token' => $token]),
             CURLOPT_CONNECTTIMEOUT => 3,
             CURLOPT_TIMEOUT => 10,
         ]);
@@ -51,8 +59,22 @@ class AdminDashboard extends BaseController
         $data['baru_hari_ini'] = $db->table('tb_member_vip')->like('created_at', $hariIni)->countAllResults();
         $data['baru_kemarin']  = $db->table('tb_member_vip')->like('created_at', $kemarin)->countAllResults();
 
-        $data['lepas_hari_ini'] = $db->table('tb_member_vip')->where('status', 'lepas_ib')->like('updated_at', $hariIni)->countAllResults();
-        $data['lepas_kemarin']  = $db->table('tb_member_vip')->where('status', 'lepas_ib')->like('updated_at', $kemarin)->countAllResults();
+        $hasLogTelegram = $this->hasMemberLogTelegramColumn($db);
+        $lepasIdentity = $hasLogTelegram
+            ? "COALESCE(NULLIF(NULLIF(id_telegram, ''), '-'), no_wa)"
+            : 'no_wa';
+        $data['lepas_hari_ini'] = (int) ($db->table('tb_member_logs')
+            ->select("COUNT(DISTINCT {$lepasIdentity}) AS total", false)
+            ->where('tipe_aktivitas', 'lepas_ib')
+            ->where('created_at >=', $hariIni . ' 00:00:00')
+            ->where('created_at <=', $hariIni . ' 23:59:59')
+            ->get()->getRowArray()['total'] ?? 0);
+        $data['lepas_kemarin'] = (int) ($db->table('tb_member_logs')
+            ->select("COUNT(DISTINCT {$lepasIdentity}) AS total", false)
+            ->where('tipe_aktivitas', 'lepas_ib')
+            ->where('created_at >=', $kemarin . ' 00:00:00')
+            ->where('created_at <=', $kemarin . ' 23:59:59')
+            ->get()->getRowArray()['total'] ?? 0);
 
         // Status pasif harus memakai last_trade terbaru dari API HFM, bukan nilai cache lokal.
         $data['pasif_total'] = count((new ActivityReminderService())->inactiveMembersFromApi(30));
@@ -122,24 +144,23 @@ class AdminDashboard extends BaseController
         $status = $this->request->getGet('status') ?? ''; // Filter Status Terakhir dari Dashboard Utama
         $date_from = $this->request->getGet('date_from') ?? '';
         $date_to = $this->request->getGet('date_to') ?? '';
-        $page = $this->request->getGet('page') ?? 1;
+        $pageRaw = trim((string) ($this->request->getGet('page') ?? '1'));
+        $page = ctype_digit($pageRaw) ? max(1, (int) $pageRaw) : 1;
         $perPage = 20;
-        $offset = ($page - 1) * $perPage;
 
         // Build query
         $builder = $db->table('tb_member_logs');
         $logTelegramSelect = $hasLogTelegram
-            ? 'COALESCE(tb_member_vip.id_telegram, tb_member_logs.id_telegram)'
+            ? "COALESCE(NULLIF(NULLIF(tb_member_logs.id_telegram, ''), '-'), NULLIF(NULLIF(tb_member_vip.id_telegram, ''), '-'))"
             : 'tb_member_vip.id_telegram';
-        $builder->select("tb_member_logs.*, tb_member_vip.status as status_member, {$logTelegramSelect} as id_telegram");
+        $statusFromLog = "CASE WHEN tb_member_logs.tipe_aktivitas IN ('lepas_ib', 'kick_massal_lepas_ib') THEN 'lepas_ib' ELSE NULL END";
+        $builder->select("tb_member_logs.*, COALESCE(tb_member_vip.status, {$statusFromLog}) as status_member, {$logTelegramSelect} as id_telegram");
 
-        // 1. SUBQUERY: Mengunci agar hanya mengambil aktivitas paling TERAKHIR per member (Berdasarkan No WA)
-        $subquery = "(SELECT no_wa, MAX(created_at) as max_date FROM tb_member_logs GROUP BY no_wa)";
-        $builder->join("$subquery sub", "sub.no_wa = tb_member_logs.no_wa AND sub.max_date = tb_member_logs.created_at", "inner");
-
-        // Hubungkan ke tabel VIP menggunakan ID HFM atau nomor WA
-        $builder->join('tb_member_vip', 'tb_member_vip.id_hfm = tb_member_logs.id_hfm OR tb_member_vip.no_wa = tb_member_logs.no_wa', 'left');
+        // Setiap baris log adalah satu kejadian; join berdasarkan ID HFM agar
+        // satu kejadian tidak berlipat saat satu nomor WA memiliki beberapa akun.
+        $builder->join('tb_member_vip', 'tb_member_vip.id_hfm = tb_member_logs.id_hfm', 'left');
         $builder->orderBy('tb_member_logs.created_at', 'DESC');
+        $builder->orderBy('tb_member_logs.id', 'DESC');
 
         // Filter search
         if (!empty($search)) {
@@ -158,7 +179,17 @@ class AdminDashboard extends BaseController
 
         // FILTER UTAMA: Menyaring log berdasarkan status member saat ini di Dashboard Utama (tb_member_vip)
         if (!empty($status)) {
-            $builder->where('tb_member_vip.status', $status);
+            if ($status === 'lepas_ib') {
+                $builder->groupStart()
+                    ->where('tb_member_vip.status', 'lepas_ib')
+                    ->orGroupStart()
+                    ->where('tb_member_vip.id IS NULL', null, false)
+                    ->where('tb_member_logs.tipe_aktivitas', 'lepas_ib')
+                    ->groupEnd()
+                    ->groupEnd();
+            } else {
+                $builder->where('tb_member_vip.status', $status);
+            }
         }
 
         // Filter tanggal
@@ -171,10 +202,13 @@ class AdminDashboard extends BaseController
 
         // Hitung total data untuk pagination (menahan query agar count akurat)
         $totalData = $builder->countAllResults(false);
-        $totalPages = ceil($totalData / $perPage);
+        $totalPages = (int) ceil($totalData / $perPage);
+        $page = $totalPages > 0 ? min($page, $totalPages) : 1;
+        $offset = ($page - 1) * $perPage;
 
         // Ambil data dengan pagination
         $data['logs'] = $builder->get($perPage, $offset)->getResultArray();
+        $data['pagerLinks'] = service('pager')->makeLinks($page, $perPage, $totalData, 'default_full');
 
         // Data untuk view
         $data['search'] = $search;
@@ -194,57 +228,313 @@ class AdminDashboard extends BaseController
             ->get()
             ->getResultArray();
 
-        // ====================================================================
-        // PERBAIKAN STATISTIK KARTU: BERDASARKAN ID TELEGRAM UNIK (BALANCE)
-        // ====================================================================
-
-        // 1. Total User Ber-ID Telegram Unik yang memiliki log aktivitas
-        $qTotal = $db->table('tb_member_logs')
-            ->select('COUNT(DISTINCT tb_member_vip.id_telegram) as total')
-            ->join('tb_member_vip', 'tb_member_vip.id_hfm = tb_member_logs.id_hfm OR tb_member_vip.no_wa = tb_member_logs.no_wa', 'left')
-            ->where('tb_member_vip.id_telegram !=', '')
-            ->where('tb_member_vip.id_telegram !=', '-')
-            ->where('tb_member_vip.id_telegram IS NOT NULL')
-            ->get()->getRowArray();
-
-        // 2. Total User Unik yang Masuk / Daftar (Menghitung variasi nama log baru)
-        $qMasuk = $db->table('tb_member_logs')
-            ->select('COUNT(DISTINCT tb_member_vip.id_telegram) as total')
-            ->join('tb_member_vip', 'tb_member_vip.id_hfm = tb_member_logs.id_hfm OR tb_member_vip.no_wa = tb_member_logs.no_wa', 'left')
-            ->where('tb_member_vip.id_telegram !=', '')
-            ->where('tb_member_vip.id_telegram !=', '-')
-            ->where('tb_member_vip.id_telegram IS NOT NULL')
-            ->whereIn('tb_member_logs.tipe_aktivitas', ['masuk', 'masuk_id_baru', 'aktif_kembali', 'masuk_via_form'])
-            ->get()->getRowArray();
-
-        // 3. Total User Unik yang Keluar / Lepas IB / Di-kick Admin
-        $qKeluar = $db->table('tb_member_logs')
-            ->select('COUNT(DISTINCT tb_member_vip.id_telegram) as total')
-            ->join('tb_member_vip', 'tb_member_vip.id_hfm = tb_member_logs.id_hfm OR tb_member_vip.no_wa = tb_member_logs.no_wa', 'left')
-            ->where('tb_member_vip.id_telegram !=', '')
-            ->where('tb_member_vip.id_telegram !=', '-')
-            ->where('tb_member_vip.id_telegram IS NOT NULL')
-            ->whereIn('tb_member_logs.tipe_aktivitas', ['keluar_sendiri', 'keluar_di_remove', 'lepas_ib', 'keluar_grup'])
-            ->get()->getRowArray();
-
-        // 4. Total User Unik yang memiliki aktivitas apa pun Hari Ini
-        $qHariIni = $db->table('tb_member_logs')
-            ->select('COUNT(DISTINCT tb_member_vip.id_telegram) as total')
-            ->join('tb_member_vip', 'tb_member_vip.id_hfm = tb_member_logs.id_hfm OR tb_member_vip.no_wa = tb_member_logs.no_wa', 'left')
-            ->where('tb_member_vip.id_telegram !=', '')
-            ->where('tb_member_vip.id_telegram !=', '-')
-            ->where('tb_member_vip.id_telegram IS NOT NULL')
-            ->where('tb_member_logs.created_at >=', date('Y-m-d 00:00:00'))
-            ->get()->getRowArray();
-
+        // Rekap kartu memakai ID trading (id_hfm) sebagai identitas bisnis.
+        // DISTINCT mencegah satu akun dihitung berulang meskipun memiliki banyak event.
+        // Query ini sengaja tidak melakukan JOIN agar satu log tidak berlipat ketika
+        // data roster berubah. Semua baris tb_member_logs tetap ditampilkan lengkap.
+        $qTotal = $this->countUniqueLoggedTradingAccounts($db);
+        $qMasuk = $this->countUniqueLoggedTradingAccounts($db, ['masuk', 'masuk_id_baru', 'aktif_kembali', 'masuk_via_form']);
+        $qKeluar = $this->countUniqueLoggedTradingAccounts($db, ['keluar_sendiri', 'keluar_di_remove', 'dihapus_admin_web', 'lepas_ib', 'keluar_grup']);
+        $qHariIni = $this->countUniqueLoggedTradingAccounts($db, null, date('Y-m-d 00:00:00'), date('Y-m-d 23:59:59'));
         $data['stats'] = [
-            'total'    => $qTotal['total'] ?? 0,
-            'masuk'    => $qMasuk['total'] ?? 0,
-            'keluar'   => $qKeluar['total'] ?? 0,
-            'hari_ini' => $qHariIni['total'] ?? 0,
+            'total'    => $qTotal,
+            'masuk'    => $qMasuk,
+            'keluar'   => $qKeluar,
+            'hari_ini' => $qHariIni,
         ];
 
+        $telegramGroup = $db->table('bot_group_links')
+            ->select('group_id, group_name')
+            ->where('platform', 'telegram')
+            ->where('is_active', 1)
+            ->get()->getRowArray();
+        $groupId = trim((string) ($telegramGroup['group_id'] ?? ''));
+        $kickCandidates = $this->countLePasIbKickCandidates($db, $hasLogTelegram, $groupId);
+        $data['lepasIbTelegramCount'] = $kickCandidates;
+        $data['kickTargetGroupName'] = (string) ($telegramGroup['group_name'] ?? '');
+        $data['kickTargetGroupId'] = $groupId;
+
         return view('admin_member_logs', $data);
+    }
+
+    public function adminHelpSessions()
+    {
+        $db = \Config\Database::connect();
+        $requests = [];
+        $errorMessage = '';
+
+        try {
+            if (!$db->tableExists('chat_logs_tele')) {
+                throw new \RuntimeException('Tabel chat_logs_tele belum tersedia.');
+            }
+
+            $builder = $db->table('chat_logs_tele AS help_log')
+                ->select('help_log.phone_number AS userId, MAX(help_log.created_at) AS requestedAt', false)
+                ->where('help_log.sender', 'bot')
+                ->groupStart()
+                    ->like('help_log.message', 'Riwayat chat kakak sudah dikirim satu kali ke admin', 'after')
+                    ->orLike('help_log.message', 'Riwayat chat kakak sudah diteruskan ke admin', 'after')
+                ->groupEnd()
+                ->where('help_log.phone_number IS NOT NULL', null, false)
+                ->where('help_log.phone_number !=', '')
+                ->groupBy('help_log.phone_number')
+                ->orderBy('requestedAt', 'DESC')
+                ->limit(100);
+
+            if ($db->tableExists('user_progress')
+                && $db->fieldExists('phone_number', 'user_progress')
+                && $db->fieldExists('user_name', 'user_progress')
+                && $db->fieldExists('current_step', 'user_progress')) {
+                $builder->select('MAX(progress.user_name) AS userName, MAX(progress.current_step) AS currentStep', false)
+                    ->join('user_progress AS progress', 'progress.phone_number = help_log.phone_number', 'left');
+            } else {
+                $builder->select('help_log.phone_number AS userName, 0 AS currentStep', false);
+            }
+
+            $requests = $builder->get()->getResultArray();
+        } catch (\Throwable $error) {
+            log_message('error', 'Gagal memuat permintaan bantuan dari database: ' . $error->getMessage());
+            $errorMessage = 'Daftar permintaan bantuan tidak dapat dibaca dari database. Periksa koneksi MySQL dan tabel chat_logs_tele.';
+        }
+
+        return view('admin_help_sessions', [
+            'title' => 'Permintaan Bantuan Admin',
+            'requests' => $requests,
+            'errorMessage' => $errorMessage,
+            'refreshedAt' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /** Unduh user Lepas IB yang dikick admin secara manual maupun massal. */
+    public function exportKickedMembers()
+    {
+        $db = \Config\Database::connect();
+        $hasLogTelegram = $this->hasMemberLogTelegramColumn($db);
+        $telegramSelect = $hasLogTelegram ? 'kick.id_telegram' : 'NULL AS id_telegram';
+        $sql = "SELECT kick.nama, kick.no_wa, {$telegramSelect}, kick.id_hfm, kick.tipe_aktivitas, kick.created_at
+            FROM tb_member_logs AS kick
+            WHERE kick.tipe_aktivitas = ?
+               OR (
+                    kick.tipe_aktivitas IN ('keluar_di_remove', 'dihapus_admin_web')
+                    AND kick.id_hfm IS NOT NULL
+                    AND EXISTS (
+                        SELECT 1 FROM tb_member_logs AS lepas
+                        WHERE lepas.id_hfm = kick.id_hfm
+                          AND lepas.tipe_aktivitas = 'lepas_ib'
+                          AND lepas.id = (
+                              SELECT MAX(previous_lepas.id) FROM tb_member_logs AS previous_lepas
+                              WHERE previous_lepas.id_hfm = kick.id_hfm
+                                AND previous_lepas.tipe_aktivitas = 'lepas_ib'
+                                AND previous_lepas.id < kick.id
+                          )
+                          AND NOT EXISTS (
+                              SELECT 1 FROM tb_member_logs AS status_change
+                              WHERE status_change.id_hfm = kick.id_hfm
+                                AND status_change.id > lepas.id
+                                AND status_change.id < kick.id
+                                AND status_change.tipe_aktivitas IN ('aktif_kembali', 'masuk', 'masuk_id_baru', 'masuk_via_form')
+                          )
+                    )
+               )
+            ORDER BY kick.created_at DESC, kick.id DESC";
+        $logs = $db->query($sql, ['kick_massal_lepas_ib'])->getResultArray();
+
+        if ($logs === []) {
+            return redirect()->to(base_url('AdminDashboard/memberLogs'))
+                ->with('warning', 'Belum ada user Lepas IB yang tercatat dikick admin, baik manual maupun massal.');
+        }
+
+        $rows = [];
+        foreach ($logs as $index => $log) {
+            $rows[] = [
+                $index + 1,
+                $log['nama'] ?? '',
+                $log['no_wa'] ?? '',
+                $log['id_telegram'] ?? '',
+                $log['id_hfm'] ?? '',
+                $log['tipe_aktivitas'] === 'kick_massal_lepas_ib'
+                    ? 'Kick massal Lepas IB'
+                    : 'Kick admin (status Lepas IB)',
+                $log['created_at'] ?? '',
+            ];
+        }
+
+        try {
+            $xlsx = (new \App\Libraries\SimpleXlsxExporter())->create([
+                'No',
+                'Nama',
+                'Nomor WhatsApp',
+                'ID Telegram',
+                'ID Trading',
+                'Aktivitas',
+                'Waktu Kick',
+            ], $rows);
+        } catch (\Throwable $exception) {
+            log_message('error', 'Gagal membuat ekspor Excel user terkick: ' . $exception->getMessage());
+            return redirect()->to(base_url('AdminDashboard/memberLogs'))
+                ->with('error', 'File Excel gagal dibuat. Pastikan ekstensi ZIP PHP tersedia.');
+        }
+
+        $fileName = 'data_user_terkick_' . date('Ymd_His') . '.xlsx';
+        return $this->response->download($fileName, $xlsx)
+            ->setContentType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '');
+    }
+
+    public function kickLepasIbMembers()
+    {
+        set_time_limit(0);
+        $db = \Config\Database::connect();
+        $tokenRow = $db->table('bot_globals')->select('key_value')
+            ->where('key_name', 'BOT_CONTROL_TOKEN')->orderBy('id', 'DESC')->get()->getRowArray();
+        $token = trim((string) ($tokenRow['key_value'] ?? ''));
+        if ($token === '') {
+            return redirect()->to(base_url('AdminDashboard/memberLogs'))
+                ->with('error', 'BOT_CONTROL_TOKEN belum dikonfigurasi.');
+        }
+
+        $botHost = trim((string) (getenv('BOT_API_HOST') ?: '127.0.0.1'));
+        $botPort = (int) (getenv('API_PORT') ?: 3000);
+        if ($botPort < 1 || $botPort > 65535) {
+            $botPort = 3000;
+        }
+        $botUrl = sprintf('http://%s:%d/api/kick-lepas-ib-members', $botHost, $botPort);
+
+        $capabilityUrl = sprintf('http://%s:%d/api/capabilities', $botHost, $botPort);
+        $capabilityCurl = curl_init($capabilityUrl);
+        curl_setopt_array($capabilityCurl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['X-Bot-Control-Token: ' . $token],
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT => 5,
+        ]);
+        $capabilityRaw = curl_exec($capabilityCurl);
+        $capabilityError = curl_error($capabilityCurl);
+        $capabilityCode = (int) curl_getinfo($capabilityCurl, CURLINFO_HTTP_CODE);
+        curl_close($capabilityCurl);
+        $capabilities = json_decode($capabilityRaw ?: '', true);
+        if ($capabilityError || $capabilityCode < 200 || $capabilityCode >= 300 ||
+            ($capabilities['capabilities']['bulk_kick_ids'] ?? false) !== true) {
+            $capabilityMessage = $capabilityCode === 401 && !$capabilityError
+                ? 'Token CI4 dan bot tidak cocok; kick massal tidak dijalankan.'
+                : 'Versi bot di VPS belum mendukung pencatatan ID hasil kick. Perbarui bot_old.js dan restart PM2; kick massal belum dijalankan.';
+            if ($capabilityError) $capabilityMessage .= ' (' . $capabilityError . ')';
+            return redirect()->to(base_url('AdminDashboard/memberLogs'))->with('error', $capabilityMessage);
+        }
+
+        $ch = curl_init($botUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Bot-Control-Token: ' . $token],
+            CURLOPT_POSTFIELDS => json_encode(['token' => $token]),
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 600,
+        ]);
+        $raw = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $result = json_decode($raw ?: '', true);
+
+        if ($curlError || $httpCode < 200 || $httpCode >= 300 || ($result['status'] ?? '') !== 'success') {
+            $message = $httpCode === 401 && !$curlError
+                ? 'Bot menolak BOT_CONTROL_TOKEN. Samakan konfigurasi database CI4 dan bot, hapus spasi/newline di awal atau akhir token, lalu restart proses bot.'
+                : ($curlError ?: (string) ($result['error'] ?? 'Bot gagal menjalankan kick massal (HTTP ' . $httpCode . ').'));
+            if ($curlError) {
+                $message = 'Bot tidak dapat dihubungi pada ' . $botUrl . ': ' . $message;
+            }
+            return redirect()->to(base_url('AdminDashboard/memberLogs'))->with('error', $message);
+        }
+
+        $reportedKickedCount = max(0, (int) ($result['kicked'] ?? 0));
+        $kickedTelegramIds = [];
+        if (is_array($result['kicked_ids'] ?? null)) {
+            foreach ($result['kicked_ids'] as $telegramId) {
+                $telegramId = trim((string) $telegramId);
+                if ($telegramId !== '' && ctype_digit($telegramId)) {
+                    $kickedTelegramIds[$telegramId] = $telegramId;
+                }
+            }
+            $kickedTelegramIds = array_values($kickedTelegramIds);
+        }
+        if ($reportedKickedCount > 0 && count($kickedTelegramIds) !== $reportedKickedCount) {
+            return redirect()->to(base_url('AdminDashboard/memberLogs'))->with(
+                'error',
+                'Bot melaporkan kick berhasil tetapi daftar ID hasilnya tidak lengkap. Data roster tidak dibersihkan; perbarui bot_old.js di VPS agar hasil kick dapat dicatat dan diunduh dengan akurat.'
+            );
+        }
+
+        // Tombol Kick adalah satu-satunya aksi yang membersihkan roster Lepas IB.
+        // tb_member_logs tidak dihapus sehingga riwayat aktivitas tetap tersedia.
+        $db->transBegin();
+        if ($this->hasMemberLogTelegramColumn($db)) {
+            $db->query(
+                "UPDATE tb_member_logs AS log_entry
+                 INNER JOIN tb_member_vip AS member ON member.id_hfm = log_entry.id_hfm
+                 SET log_entry.id_telegram = member.id_telegram
+                 WHERE member.status = 'lepas_ib'
+                   AND member.id_telegram IS NOT NULL
+                   AND TRIM(member.id_telegram) NOT IN ('', '-')
+                   AND (log_entry.id_telegram IS NULL OR TRIM(log_entry.id_telegram) IN ('', '-'))"
+            );
+        }
+        $hasLogTelegram = $this->hasMemberLogTelegramColumn($db);
+        foreach ($kickedTelegramIds as $telegramId) {
+            $memberRows = $db->query(
+                "SELECT no_wa, nama, id_hfm FROM tb_member_vip WHERE status = 'lepas_ib' AND TRIM(id_telegram) = ?",
+                [$telegramId]
+            )->getResultArray();
+
+            if ($memberRows === [] && $hasLogTelegram) {
+                $history = $db->query(
+                    "SELECT no_wa, nama, id_hfm FROM tb_member_logs WHERE TRIM(id_telegram) = ? AND tipe_aktivitas = 'lepas_ib' ORDER BY created_at DESC, id DESC LIMIT 1",
+                    [$telegramId]
+                )->getRowArray();
+                if ($history) $memberRows[] = $history;
+            }
+            if ($memberRows === []) {
+                $memberRows[] = ['no_wa' => null, 'nama' => null, 'id_hfm' => null];
+            }
+
+            foreach ($memberRows as $memberRow) {
+                $logData = [
+                    'no_wa' => $memberRow['no_wa'] ?? null,
+                    'nama' => $memberRow['nama'] ?? null,
+                    'id_hfm' => $memberRow['id_hfm'] ?? null,
+                    'tipe_aktivitas' => 'kick_massal_lepas_ib',
+                ];
+                if ($hasLogTelegram) $logData['id_telegram'] = $telegramId;
+                $db->table('tb_member_logs')->insert($logData);
+            }
+        }
+        if (!$db->transStatus()) {
+            $db->transRollback();
+            return redirect()->to(base_url('AdminDashboard/memberLogs'))
+                ->with('error', 'Kick selesai, tetapi ID Telegram pada riwayat tidak berhasil dipertahankan. Data roster tidak dihapus.');
+        }
+        $db->table('tb_member_vip')->where('status', 'lepas_ib')->delete();
+        $removedFromDashboard = $db->affectedRows();
+        if (!$db->transStatus()) {
+            $db->transRollback();
+            return redirect()->to(base_url('AdminDashboard/memberLogs'))
+                ->with('error', 'Kick selesai, tetapi data Lepas IB di dashboard gagal dibersihkan. Riwayat aktivitas tetap tersimpan.');
+        }
+        $db->transCommit();
+
+        $summary = sprintf(
+            'Proses grup %s selesai. Kandidat: %d; berhasil dikeluarkan: %d; dilewati: %d; gagal: %d; data Lepas IB di dashboard dihapus: %d. Riwayat aktivitas tetap tersimpan.',
+            (string) ($result['group_name'] ?? 'Telegram VIP'),
+            (int) ($result['candidates'] ?? 0),
+            (int) ($result['kicked'] ?? 0),
+            (int) ($result['skipped'] ?? 0),
+            (int) ($result['failed'] ?? 0),
+            $removedFromDashboard,
+        );
+        if ((int) ($result['failed'] ?? 0) > 0) {
+            $summary .= ' Periksa log bot dan daftar ban grup; kegagalan setelah ban mungkin memerlukan unban manual.';
+        }
+        $flashKey = (int) ($result['failed'] ?? 0) > 0 ? 'warning' : 'pesan';
+        return redirect()->to(base_url('AdminDashboard/memberLogs'))->with($flashKey, $summary);
     }
 
     // ==========================================
@@ -910,6 +1200,14 @@ class AdminDashboard extends BaseController
                     'status'     => 'aktif',
                     'last_trade' => $last_trade_real
                 ];
+                $apiEmail = trim((string) ($dataApi['email'] ?? ''));
+                if ($apiEmail !== '') {
+                    $updateData['email'] = $apiEmail;
+                }
+                if (array_key_exists('campaign', $dataApi)) {
+                    $campaign = trim((string) ($dataApi['campaign'] ?? ''));
+                    $updateData['campaign'] = $campaign !== '' ? $campaign : null;
+                }
 
                 // PENCATATAN LOG: Jika status berubah jadi aktif
                 if ($member['status'] !== 'aktif') {
@@ -917,6 +1215,7 @@ class AdminDashboard extends BaseController
                         'no_wa'          => $member['no_wa'],
                         'nama'           => $member['nama'],
                         'id_hfm'         => $member['id_hfm'],
+                        'id_telegram'    => $member['id_telegram'] ?? null,
                         'tipe_aktivitas' => 'aktif_kembali'
                     ]);
                 }
@@ -928,17 +1227,43 @@ class AdminDashboard extends BaseController
                     'data' => $updateData
                 ]);
             } else {
-                // PENCATATAN LOG: Jika tidak valid/lepas IB
-                if ($member['status'] !== 'lepas_ib') {
-                    $db->table('tb_member_logs')->insert([
-                        'no_wa'          => $member['no_wa'],
-                        'nama'           => $member['nama'],
-                        'id_hfm'         => $member['id_hfm'],
-                        'tipe_aktivitas' => 'lepas_ib'
+                // Sync hanya memperbarui status. Penghapusan roster dilakukan
+                // khusus oleh tombol Kick pada halaman Member Logs.
+                $hasLogTelegram = $this->hasMemberLogTelegramColumn($db);
+                $logData = [
+                    'no_wa'          => $member['no_wa'],
+                    'nama'           => $member['nama'],
+                    'id_hfm'         => $member['id_hfm'],
+                    'tipe_aktivitas' => 'lepas_ib',
+                ];
+                if ($hasLogTelegram) {
+                    $logData['id_telegram'] = $member['id_telegram'] ?? null;
+                }
+
+                $db->transBegin();
+                $existingLog = $db->table('tb_member_logs')
+                    ->where('id_hfm', $member['id_hfm'])
+                    ->orderBy('created_at', 'DESC')
+                    ->orderBy('id', 'DESC')
+                    ->get()->getRowArray();
+                if (!$existingLog || ($existingLog['tipe_aktivitas'] ?? '') !== 'lepas_ib') {
+                    $db->table('tb_member_logs')->insert($logData);
+                } elseif ($hasLogTelegram && in_array(trim((string) ($existingLog['id_telegram'] ?? '')), ['', '-'], true) && !empty($member['id_telegram'])) {
+                    $db->table('tb_member_logs')->where('id', $existingLog['id'])->update([
+                        'id_telegram' => $member['id_telegram'],
                     ]);
                 }
 
                 $db->table('tb_member_vip')->where('id_hfm', $id_hfm)->update(['status' => 'lepas_ib']);
+                $memberStillExists = $db->table('tb_member_vip')->where('id_hfm', $id_hfm)->countAllResults();
+                if (!$db->transStatus() || $memberStillExists < 1) {
+                    $db->transRollback();
+                    return $this->response->setStatusCode(500)->setJSON([
+                        'status' => 'error',
+                        'pesan' => 'Status Lepas IB terdeteksi, tetapi status gagal disimpan. Data peserta tidak dihapus.',
+                    ]);
+                }
+                $db->transCommit();
 
                 return $this->response->setJSON(['status' => 'lepas_ib']);
             }
@@ -1252,6 +1577,17 @@ class AdminDashboard extends BaseController
         ];
         if ($this->hasMemberLogTelegramColumn($db)) {
             $logData['id_telegram'] = $cek['id_telegram'] ?? null;
+            $telegramId = trim((string) ($cek['id_telegram'] ?? ''));
+            if ($telegramId !== '' && $telegramId !== '-') {
+                $db->table('tb_member_logs')
+                    ->where('id_hfm', $cek['id_hfm'])
+                    ->groupStart()
+                    ->where('id_telegram IS NULL', null, false)
+                    ->orWhere('id_telegram', '')
+                    ->orWhere('id_telegram', '-')
+                    ->groupEnd()
+                    ->update(['id_telegram' => $telegramId]);
+            }
         }
         $db->table('tb_member_logs')->insert($logData);
 
@@ -1269,6 +1605,92 @@ class AdminDashboard extends BaseController
         return (bool) $db->query(
             "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tb_member_logs' AND COLUMN_NAME = 'id_telegram' LIMIT 1"
         )->getRow();
+    }
+
+    private function countUniqueLoggedTradingAccounts($db, ?array $types = null, ?string $createdSince = null, ?string $createdUntil = null): int
+    {
+        // id_hfm adalah ID trading dan boleh tersimpan sebagai string; trim membuat
+        // nilai kosong/berisi spasi tidak ikut dihitung sebagai satu akun.
+        $tradingExpr = "NULLIF(TRIM(tb_member_logs.id_hfm), '')";
+        $builder = $db->table('tb_member_logs')
+            ->select("COUNT(DISTINCT {$tradingExpr}) AS total", false)
+            ->where("{$tradingExpr} IS NOT NULL", null, false)
+            ->where("{$tradingExpr} <> '-'", null, false);
+
+        if ($types !== null) {
+            $builder->whereIn('tb_member_logs.tipe_aktivitas', $types);
+        }
+        if ($createdSince !== null) {
+            $builder->where('tb_member_logs.created_at >=', $createdSince);
+        }
+        if ($createdUntil !== null) {
+            $builder->where('tb_member_logs.created_at <=', $createdUntil);
+        }
+
+        return (int) ($builder->get()->getRowArray()['total'] ?? 0);
+    }
+
+    private function countLePasIbKickCandidates($db, bool $hasLogTelegram, string $groupId): int
+    {
+        if ($groupId === '') {
+            return 0;
+        }
+
+        if (!$hasLogTelegram) {
+            $row = $db->query(
+                "SELECT COUNT(DISTINCT TRIM(id_telegram)) AS total
+                 FROM tb_member_vip
+                 WHERE status = 'lepas_ib'
+                   AND id_telegram IS NOT NULL
+                   AND TRIM(id_telegram) REGEXP '^[0-9]+$'
+                   AND NOT EXISTS (
+                     SELECT 1 FROM telegram_group_members AS membership
+                     WHERE membership.telegram_id = TRIM(tb_member_vip.id_telegram)
+                       AND membership.group_id = ? AND membership.status = 'left'
+                   )",
+                [$groupId]
+            )->getRowArray();
+            return (int) ($row['total'] ?? 0);
+        }
+
+        $row = $db->query(
+            "SELECT COUNT(DISTINCT candidates.telegram_id) AS total
+             FROM (
+               SELECT TRIM(id_telegram) AS telegram_id
+               FROM tb_member_vip
+                 WHERE status = 'lepas_ib'
+                   AND id_telegram IS NOT NULL
+                   AND TRIM(id_telegram) REGEXP '^[0-9]+$'
+                   AND NOT EXISTS (
+                     SELECT 1 FROM telegram_group_members AS membership
+                     WHERE membership.telegram_id = TRIM(tb_member_vip.id_telegram)
+                       AND membership.group_id = ? AND membership.status = 'left'
+                   )
+               UNION
+               SELECT TRIM(logs.id_telegram) AS telegram_id
+               FROM tb_member_logs AS logs
+               WHERE logs.tipe_aktivitas = 'lepas_ib'
+                 AND logs.id_telegram IS NOT NULL
+                 AND TRIM(logs.id_telegram) REGEXP '^[0-9]+$'
+                 AND NOT EXISTS (
+                   SELECT 1 FROM telegram_group_members AS membership
+                   WHERE membership.telegram_id = TRIM(logs.id_telegram)
+                     AND membership.group_id = ? AND membership.status = 'left'
+                 )
+                 AND NOT EXISTS (
+                   SELECT 1 FROM tb_member_logs AS newer
+                   WHERE TRIM(newer.id_telegram) = TRIM(logs.id_telegram)
+                     AND newer.id > logs.id
+                 )
+                 AND NOT EXISTS (
+                   SELECT 1 FROM tb_member_vip AS current_member
+                   WHERE TRIM(current_member.id_telegram) = TRIM(logs.id_telegram)
+                     AND current_member.status = 'aktif'
+                 )
+             ) AS candidates",
+            [$groupId, $groupId]
+        )->getRowArray();
+        return (int) ($row['total'] ?? 0);
     }
 
     // ==========================================

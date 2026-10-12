@@ -1,0 +1,103 @@
+async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
+  const adminId = String(botSettings.globals.ID_ADMIN || "").trim();
+  if (!adminId) {
+    const message = "Maaf kak, admin belum dikonfigurasi di bot. Silakan hubungi pengelola grup secara langsung.";
+    await ctx.reply(message);
+    await saveChatLog(userId, "bot", message);
+    return false;
+  }
+
+  const sender = ctx.from || {};
+  const fullName = [sender.first_name, sender.last_name].filter(Boolean).join(" ") || userName || "Kak";
+  const username = sender.username ? "@" + sender.username : "-";
+  const stageLabels = {
+    1: "Status akun",
+    2: "Pendaftaran akun",
+    3: "Screenshot akun",
+    4: "Pindah IB",
+    5: "Arsip akun",
+    6: "MT5 / deposit",
+    7: "Formulir / undangan",
+  };
+  const stageLabel = stageLabels[Number(currentStep)] || "Tahap " + currentStep;
+  const photoFileIds = new Set();
+  let latestUserNote = "";
+  const isAdminHelpButtonText = (value) => {
+    const normalized = String(value || "").toLocaleLowerCase("id").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const buttonPhrase = "tolong saya admin";
+    return normalized === buttonPhrase ||
+      normalized.replace(/^(?:[\p{L}\p{N}]{1,3}\s+)+(?=tolong saya admin$)/u, "") === buttonPhrase;
+  };
+  try {
+    const [rows] = await db.query(
+      "SELECT message FROM chat_logs_tele WHERE phone_number = ? AND sender = 'user' ORDER BY id DESC LIMIT 20",
+      [String(userId)],
+    );
+    for (const row of rows) {
+      const storedMessage = String(row.message || "");
+      for (const match of storedMessage.matchAll(/\[TELEGRAM_FILE_ID:([^\]]+)\]/g)) {
+        photoFileIds.add(match[1]);
+      }
+      if (!latestUserNote) {
+        const note = storedMessage
+          .replace(/\[TELEGRAM_FILE_ID:[^\]]+\]/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (note && note !== "[Photo]" && !isAdminHelpButtonText(note)) {
+          latestUserNote = note;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[ADMIN HELP HISTORY ERROR]", error.message);
+  }
+
+  const currentMessage = String(ctx.message?.text || ctx.message?.caption || "").trim();
+  if (currentMessage && !isAdminHelpButtonText(currentMessage)) latestUserNote = currentMessage;
+  const notePreview = [...(latestUserNote || "Tidak ada keterangan tambahan; silakan lihat foto terlampir bila tersedia.")].slice(0, 700).join("");
+  const reportTime = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
+  const userProfileLink = "tg://user?id=" + encodeURIComponent(String(userId));
+  const report = [
+    "🆘 USER MEMINTA BANTUAN PENDAFTARAN",
+    "Nama: " + fullName,
+    "Username: " + username,
+    "ID Telegram: " + userId,
+    "Kendala pada bagian: " + stageLabel,
+    "Keterangan user terakhir: " + notePreview,
+    "Foto user terlampir: " + Math.min(photoFileIds.size, 10),
+    "Waktu: " + reportTime + " WIB",
+    "Silakan hubungi user secara langsung. Pesan tidak diteruskan melalui bot.",
+  ].join("\n");
+
+  try {
+    await bot.telegram.sendMessage(adminId, report, {
+      reply_markup: {
+        inline_keyboard: [[{ text: "📨 Buka chat user", url: userProfileLink }]],
+      },
+    });
+  } catch (error) {
+    console.error("[ADMIN HELP REPORT ERROR]", error.message);
+    const failure = "Maaf kak, informasi belum berhasil dikirim ke admin. Coba lagi beberapa saat.";
+    await ctx.reply(failure);
+    await saveChatLog(userId, "bot", failure);
+    return false;
+  }
+
+  for (const [index, fileId] of [...photoFileIds].slice(0, 10).entries()) {
+    try {
+      await bot.telegram.sendPhoto(adminId, fileId, {
+        caption: "Foto user " + (index + 1) + " · " + fullName + " · ID Telegram " + userId + " · " + stageLabel,
+      });
+    } catch (error) {
+      console.error("[ADMIN HELP PHOTO ERROR]", error.message);
+    }
+  }
+
+  const pendingTimeout = userTimeouts[String(userId)]?.timeout;
+  if (pendingTimeout) clearTimeout(pendingTimeout);
+  delete userTimeouts[String(userId)];
+  const confirmation = "Info kendala kakak sudah dikirim satu kali ke admin. Admin akan menghubungi kakak langsung melalui Telegram. Pesan berikutnya tidak diteruskan melalui bot.";
+  await ctx.reply(confirmation);
+  await saveChatLog(userId, "bot", "Riwayat chat kakak sudah dikirim satu kali ke admin. Admin akan menghubungi kakak langsung melalui Telegram.");
+  return true;
+}

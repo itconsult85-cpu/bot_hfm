@@ -1,0 +1,83 @@
+// Periksa status validasi/invite sebelum menawarkan bantuan pendaftaran.
+          const userKey = String(userId);
+          if (!isAdmin) {
+            try {
+              const statusUrl = "http://103.89.4.144/bot_wa/client/check_status_vip/" + userId;
+              const controlToken = getBotControlToken();
+              if (!controlToken) throw new Error("BOT_CONTROL_TOKEN belum dikonfigurasi pada bot.");
+              const checkStatus = await axios.get(statusUrl, {
+                timeout: 5000,
+                headers: { "X-Bot-Control-Token": controlToken },
+              });
+              if (checkStatus.data && checkStatus.data.is_vip === true) {
+                const wasAlreadyValidated = validatedUsers.has(userKey);
+                validatedUsers.add(userKey);
+                let isMember = false;
+                try {
+                  const member = await bot.telegram.getChatMember(ID_GRUP_VIP, parseInt(userId, 10));
+                  isMember = ["creator", "administrator", "member"].includes(member.status);
+                } catch (memberError) {
+                  console.warn("[VIP MEMBERSHIP CHECK]", memberError.message);
+                }
+
+                userSteps[userId] = 7;
+                if (isMember) {
+                  const registeredMessage = "Kak, akun kakak sudah tervalidasi dan sudah terdaftar di Grup VIP. Bot ini hanya melayani pendaftaran.";
+                  await ctx.reply(registeredMessage, { reply_markup: { remove_keyboard: true } });
+                  await saveChatLog(userId, "bot", "User tervalidasi dan sudah terdaftar di Grup VIP.");
+                  return;
+                }
+
+                if (wasAlreadyValidated) {
+                  const invitedMessage = "Kak, akun kakak sudah tervalidasi dan undangan Grup VIP sudah diberikan. Bot ini hanya melayani pendaftaran.";
+                  await ctx.reply(invitedMessage, { reply_markup: { remove_keyboard: true } });
+                  await saveChatLog(userId, "bot", invitedMessage);
+                  return;
+                }
+
+                const inviteLink = await bot.telegram.createChatInviteLink(ID_GRUP_VIP, {
+                  expire_date: Math.floor(Date.now() / 1000) + 60,
+                  member_limit: 1,
+                });
+                const inviteMessage = "Status akun kakak sudah tervalidasi. Silakan bergabung ke Grup VIP melalui tautan ini:\n" + inviteLink.invite_link;
+                const sentMsg = await ctx.reply(inviteMessage, { reply_markup: { remove_keyboard: true } });
+                await saveChatLog(userId, "bot", "Status tervalidasi; tautan undangan Grup VIP sudah dikirim.");
+                setTimeout(async () => {
+                  try {
+                    await bot.telegram.deleteMessage(userId, sentMsg.message_id);
+                  } catch (error) {}
+                }, 60000);
+                return;
+              }
+              validatedUsers.delete(userKey);
+            } catch (statusError) {
+              if (statusError.response?.status === 401) {
+                console.error("[VIP STATUS CHECK ERROR] CI4 menolak BOT_CONTROL_TOKEN; samakan konfigurasi bot dan CI4.");
+              } else {
+                console.error("[VIP STATUS CHECK ERROR]", statusError.message);
+              }
+              await ctx.reply(
+                "Maaf kak, status pendaftaran belum dapat diperiksa oleh sistem. Silakan coba lagi beberapa saat lagi atau hubungi admin secara langsung.",
+                { reply_markup: { remove_keyboard: true } },
+              );
+              await saveChatLog(userId, "bot", "Pemeriksaan status VIP gagal; pendaftaran ditunda.");
+              return;
+            }
+
+            if (validatedUsers.has(userKey)) {
+              const registeredMessage = "Kak, akun kakak sudah tervalidasi dan undangan Grup VIP sudah diberikan. Bot ini hanya melayani pendaftaran.";
+              await ctx.reply(registeredMessage, { reply_markup: { remove_keyboard: true } });
+              return;
+            }
+          }
+
+          if (!isAdmin && isAdminHelpKeyword(textMessage)) {
+            await sendAdminHelpReport(ctx, userKey, userName, currentStep);
+            return;
+          }
+
+          if (!isAdmin && isConfusionOrHumanHelpRequest(textMessage)) {
+            const helpChoice = "Saya coba bantu dulu ya, Kak. Jika masih terkendala dan ingin dibantu admin, tekan tombol di bawah atau ketik: tolong saya admin.";
+            await ctx.reply(helpChoice, { reply_markup: adminHelpKeyboard() });
+            await saveChatLog(userId, "bot", helpChoice);
+          }

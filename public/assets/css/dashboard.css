@@ -72,3 +72,25 @@ body.vip-console { background: #f8fafc; font-family: 'Inter', system-ui, sans-se
 .vip-console .data-card:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.05); border-color: #cbd5e1; }
 .vip-console .avatar-sub { width: 48px; height: 48px; background: #eff6ff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #2563eb; font-size: 1.2rem; }
 .login-page { background-color: #f4f6f9; display: flex; align-items: center; justify-content: center; height: 100vh; }
+
+/* Compact, readable participant fields on the main dashboard. */
+.member-data-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.4fr) minmax(215px, 1.35fr) minmax(140px, 0.85fr) minmax(155px, 1fr) minmax(110px, 0.7fr) minmax(160px, 1fr);
+    gap: 0.75rem;
+    align-items: center;
+}
+.member-data-grid > * { min-width: 0; }
+.member-data-field { min-width: 0; }
+.member-data-field .text-break { overflow-wrap: anywhere; }
+.member-data-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+@media (max-width: 1199.98px) {
+    .member-data-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 767.98px) {
+    .member-data-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .member-data-identity { grid-column: 1 / -1; }
+}
+@media (max-width: 575.98px) {
+    .member-data-grid { grid-template-columns: minmax(0, 1fr); }
+}

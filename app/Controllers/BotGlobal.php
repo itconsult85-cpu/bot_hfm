@@ -38,7 +38,7 @@ class BotGlobal extends BaseController
         }
 
         $this->globalModel->save([
-            'key_name'  => $this->request->getPost('key_name'),
+            'key_name'  => $keyName,
             'key_value' => $this->request->getPost('key_value')
         ]);
         return redirect()->to('/bot-global')->with('pesan', 'Variabel berhasil ditambahkan.');
@@ -66,7 +66,7 @@ class BotGlobal extends BaseController
         }
 
         $this->globalModel->update($id, [
-            'key_name'  => $this->request->getPost('key_name'),
+            'key_name'  => $keyName,
             'key_value' => $this->request->getPost('key_value')
         ]);
         return redirect()->to('/bot-global')->with('pesan', 'Variabel berhasil diubah.');

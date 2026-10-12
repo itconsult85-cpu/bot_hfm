@@ -4,11 +4,31 @@
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 mt-2 gap-3">
     <div>
         <h3 class="fw-bold tracking-tight mb-1"><i class="bi bi-clock-history text-primary me-2"></i>Log Aktivitas Member</h3>
-        <p class="text-muted small mb-0">Riwayat aktivitas masuk dan keluar member VIP.</p>
+        <p class="text-muted small mb-0">Riwayat aktivitas masuk dan keluar member VIP. Riwayat kick tetap tersedia setelah data roster dihapus.</p>
     </div>
-    <a href="<?= base_url('AdminDashboard') ?>" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold">
-        <i class="bi bi-arrow-left me-2"></i>Kembali
-    </a>
+    <div class="d-flex flex-wrap gap-2">
+        <form id="kickLepasIbForm" method="POST" action="<?= base_url('AdminDashboard/kickLepasIbMembers') ?>"
+            data-candidate-count="<?= (int) ($lepasIbTelegramCount ?? 0) ?>"
+            data-target-group="<?= esc($kickTargetGroupName ?? 'Grup Telegram VIP aktif', 'attr') ?>">
+            <?= csrf_field() ?>
+            <button id="kickLepasIbButton" type="submit" class="btn btn-danger rounded-pill px-3 fw-semibold"
+                <?= empty($kickTargetGroupId) || (int) ($lepasIbTelegramCount ?? 0) === 0 ? 'disabled' : '' ?>
+                title="Keluarkan anggota berstatus Lepas IB dari grup Telegram aktif">
+                <i class="bi bi-person-x-fill me-1"></i>Kick Lepas IB
+                <span class="badge text-bg-light text-danger ms-1"><?= number_format((int) ($lepasIbTelegramCount ?? 0)) ?></span>
+            </button>
+        </form>
+        <a href="<?= base_url('AdminDashboard/exportKickedMembers') ?>" class="btn btn-outline-success rounded-pill px-3 fw-semibold"
+            title="Unduh user berstatus Lepas IB yang dikick admin manual maupun massal">
+            <i class="bi bi-file-earmark-excel me-1"></i>Unduh Excel Kick Lepas IB
+        </a>
+        <a href="<?= base_url('admin/help-sessions') ?>" class="btn btn-outline-primary rounded-pill px-3 fw-semibold">
+            <i class="bi bi-person-lines-fill me-1"></i>Permintaan Bantuan Admin
+        </a>
+        <a href="<?= base_url('AdminDashboard') ?>" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold">
+            <i class="bi bi-arrow-left me-2"></i>Kembali
+        </a>
+    </div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -60,7 +80,19 @@
 
 <?php if (session()->getFlashdata('pesan')) : ?>
     <div class="alert alert-success alert-dismissible fade show rounded-4 shadow-sm" role="alert">
-        <i class="bi bi-check-circle-fill me-2"></i> <?= session()->getFlashdata('pesan') ?>
+        <i class="bi bi-check-circle-fill me-2"></i> <?= esc(session()->getFlashdata('pesan')) ?>
+        <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+<?php endif; ?>
+<?php if (session()->getFlashdata('warning')) : ?>
+    <div class="alert alert-warning alert-dismissible fade show rounded-4 shadow-sm" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i><?= esc(session()->getFlashdata('warning')) ?>
+        <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+<?php endif; ?>
+<?php if (session()->getFlashdata('error')) : ?>
+    <div class="alert alert-danger alert-dismissible fade show rounded-4 shadow-sm" role="alert">
+        <i class="bi bi-x-circle-fill me-2"></i><?= esc(session()->getFlashdata('error')) ?>
         <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
@@ -181,6 +213,7 @@
                                         break;
                                     case 'keluar_di_remove':
                                     case 'dihapus_admin_web':
+                                    case 'kick_massal_lepas_ib':
                                         $badgeClass = 'bg-danger text-white';
                                         $icon = 'bi-x-circle';
                                         break;
@@ -192,6 +225,7 @@
                                 $label = match ($tipeAktivitasBersih) {
                                     'keluar_sendiri' => 'Keluar sendiri',
                                     'keluar_di_remove', 'dihapus_admin_web' => 'Di-kick admin',
+                                    'kick_massal_lepas_ib' => 'Kick massal Lepas IB',
                                     'keluar_grup' => 'Keluar grup',
                                     default => ucfirst(str_replace('_', ' ', $tipeAktivitasBersih)),
                                 };
@@ -275,56 +309,13 @@
         </table>
     </div>
 
-    <?php if ($totalPages > 1): ?>
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4">
-            <span class="text-muted small mb-2 mb-md-0">
-                Menampilkan <b><?= ($currentPage - 1) * $perPage + 1 ?></b> hingga <b><?= min($currentPage * $perPage, $totalData) ?></b> dari <b><?= number_format($totalData) ?></b> data
-            </span>
-            <nav>
-                <ul class="pagination pagination-sm mb-0 flex-wrap">
-                    <li class="page-item <?= $currentPage == 1 ? 'disabled' : '' ?>">
-                        <a class="page-link shadow-sm rounded-start-pill" href="<?= $currentPage > 1 ? '?page=' . ($currentPage - 1) . '&search=' . urlencode($search) . '&tipe=' . urlencode($tipe) . '&status=' . urlencode($status ?? '') . '&date_from=' . urlencode($date_from) . '&date_to=' . urlencode($date_to) : '#' ?>">&laquo;</a>
-                    </li>
-                    <?php
-                    $maxVisibleButtons = 5;
-                    $startPage = max(1, $currentPage - floor($maxVisibleButtons / 2));
-                    $endPage = min($totalPages, $startPage + $maxVisibleButtons - 1);
-                    if ($endPage - $startPage + 1 < $maxVisibleButtons) {
-                        $startPage = max(1, $endPage - $maxVisibleButtons + 1);
-                    }
-                    ?>
-                    <?php if ($startPage > 1): ?>
-                        <li class="page-item">
-                            <a class="page-link shadow-sm" href="?page=1&search=<?= urlencode($search) ?>&tipe=<?= urlencode($tipe) ?>&status=<?= urlencode($status ?? '') ?>&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>">1</a>
-                        </li>
-                        <?php if ($startPage > 2): ?>
-                            <li class="page-item disabled">
-                                <span class="page-link shadow-sm border-0 text-muted">...</span>
-                            </li>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                    <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
-                        <li class="page-item <?= $i == $currentPage ? 'active' : '' ?>">
-                            <a class="page-link shadow-sm" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&tipe=<?= urlencode($tipe) ?>&status=<?= urlencode($status ?? '') ?>&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>"><?= $i ?></a>
-                        </li>
-                    <?php endfor; ?>
-                    <?php if ($endPage < $totalPages): ?>
-                        <?php if ($endPage < $totalPages - 1): ?>
-                            <li class="page-item disabled">
-                                <span class="page-link shadow-sm border-0 text-muted">...</span>
-                            </li>
-                        <?php endif; ?>
-                        <li class="page-item">
-                            <a class="page-link shadow-sm" href="?page=<?= $totalPages ?>&search=<?= urlencode($search) ?>&tipe=<?= urlencode($tipe) ?>&status=<?= urlencode($status ?? '') ?>&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>"><?= $totalPages ?></a>
-                        </li>
-                    <?php endif; ?>
-                    <li class="page-item <?= $currentPage == $totalPages ? 'disabled' : '' ?>">
-                        <a class="page-link shadow-sm rounded-end-pill" href="<?= $currentPage < $totalPages ? '?page=' . ($currentPage + 1) . '&search=' . urlencode($search) . '&tipe=' . urlencode($tipe) . '&status=' . urlencode($status ?? '') . '&date_from=' . urlencode($date_from) . '&date_to=' . urlencode($date_to) : '#' ?>">&raquo;</a>
-                    </li>
-                </ul>
-            </nav>
-        </div>
-    <?php endif; ?>
+    <?php $logsFrom = $totalData > 0 ? (($currentPage - 1) * $perPage + 1) : 0; $logsTo = min($currentPage * $perPage, $totalData); ?>
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 mt-4">
+        <span class="text-muted small">
+            <?php if ($totalData > 0): ?>Menampilkan <b><?= $logsFrom ?></b> hingga <b><?= $logsTo ?></b> dari <b><?= number_format($totalData) ?></b> data<?php else: ?>Menampilkan 0 data<?php endif; ?>
+        </span>
+        <?= $pagerLinks ?? '' ?>
+    </div>
 </div>
 
 <div class="modal fade" id="modalDetail" tabindex="-1" aria-hidden="true">
@@ -413,10 +404,82 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalKonfirmasiKick" tabindex="-1" aria-labelledby="modalKonfirmasiKickLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 460px;">
+        <div class="modal-content shadow-lg border-0 rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="modalKonfirmasiKickLabel">
+                    <i class="bi bi-person-x-fill text-danger me-2"></i>Konfirmasi Kick Member
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-warning rounded-3 small mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Tindakan ini akan mengeluarkan member berstatus <strong>Lepas IB</strong> dari grup Telegram.
+                </div>
+                <p class="text-muted small mb-2">Sistem akan memeriksa:</p>
+                <ul class="small text-muted mb-3">
+                    <li><strong id="kickConfirmationCount">0</strong> kandidat Lepas IB</li>
+                    <li>Grup Telegram <strong id="kickConfirmationGroup">Grup Telegram VIP aktif</strong></li>
+                </ul>
+                <p class="text-muted small mb-0">
+                    Member yang sudah keluar serta admin atau pemilik grup akan dilewati. Status member di database tidak diubah.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Batal</button>
+                <button type="button" id="confirmKickLepasIbButton" class="btn btn-danger rounded-pill px-4 fw-semibold">
+                    <i class="bi bi-person-x-fill me-1"></i>Ya, Lanjutkan Kick
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
 <script>
+    const kickLepasIbForm = document.getElementById('kickLepasIbForm');
+    const kickConfirmationModalElement = document.getElementById('modalKonfirmasiKick');
+    const kickConfirmationModal = kickConfirmationModalElement
+        ? new bootstrap.Modal(kickConfirmationModalElement)
+        : null;
+    let kickSubmissionConfirmed = false;
+
+    if (kickLepasIbForm) {
+        kickLepasIbForm.addEventListener('submit', event => {
+            if (kickSubmissionConfirmed) {
+                kickSubmissionConfirmed = false;
+                const button = document.getElementById('kickLepasIbButton');
+                if (button) {
+                    button.disabled = true;
+                    button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Memproses...';
+                }
+                return;
+            }
+
+            event.preventDefault();
+            const count = Number(kickLepasIbForm.dataset.candidateCount || 0);
+            const groupName = kickLepasIbForm.dataset.targetGroup || 'grup Telegram VIP aktif';
+            const countElement = document.getElementById('kickConfirmationCount');
+            const groupElement = document.getElementById('kickConfirmationGroup');
+            if (countElement) countElement.textContent = count.toLocaleString('id-ID');
+            if (groupElement) groupElement.textContent = groupName;
+
+            if (kickConfirmationModal) {
+                kickConfirmationModal.show();
+            }
+        });
+    }
+
+    document.getElementById('confirmKickLepasIbButton')?.addEventListener('click', () => {
+        kickSubmissionConfirmed = true;
+        kickConfirmationModal?.hide();
+        kickLepasIbForm?.requestSubmit();
+    });
+
     function showDetail(wa, telegram, nama, tipe, waktu, idTrading) {
         document.getElementById('detailWa').textContent = wa;
         document.getElementById('detailTelegram').textContent = telegram;

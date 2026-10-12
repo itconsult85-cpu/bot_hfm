@@ -1,0 +1,1514 @@
+﻿diff --git "a/D:\\Aplikasi Web\\bot.js" "b/D:\\xampp\\htdocs\\hfm_admin\\bot.js"
+index c8a8a82..40b8058 100644
+--- "a/D:\\Aplikasi Web\\bot.js"	
++++ "b/D:\\xampp\\htdocs\\hfm_admin\\bot.js"
+@@ -1,131 +1,26 @@
++require("dotenv").config();
+ const { Telegraf } = require("telegraf");
+ const mysql = require("mysql2/promise");
+ const express = require("express");
+-const cors = require("cors");
+ const axios = require("axios");
+ const cron = require("node-cron");
+ const Tesseract = require("tesseract.js");
+ const { GoogleGenerativeAI } = require("@google/generative-ai");
+-const { execFile } = require("child_process");
+ 
+ // 1. EXPRESS & PORT MANAGEMENT
+ const app = express();
+-const API_PORT = 3000;
+-app.use(express.json());
+-app.use(cors());
++const API_PORT = Number(process.env.API_PORT || 3000);
++app.use(express.json({ limit: "64kb" }));
++// The control API is bound to localhost by deployment; do not expose it with a wildcard CORS policy.
+ 
+-app.post("/api/restart-bot", (req, res) => {
+-  const rawToken =
+-    botSettings.globals.BOT_CONTROL_TOKEN || "token_rahasia_bot_123";
+-  const configuredToken = String(rawToken).trim();
+-
+-  if (!req.body || req.body.token !== configuredToken) {
+-    return res.status(403).json({ error: "Token restart tidak valid." });
+-  }
+-
+-  res.json({ message: "bot_tele_hfm berhasil direstart (PM2 Auto-Restart)." });
+-
+-  setTimeout(() => {
+-    console.log(
+-      "[SYSTEM] Menerima perintah restart dari Web. Mematikan proses untuk memicu PM2 auto-restart...",
+-    );
+-    process.exit(1);
+-  }, 1000);
+-});
+-
+-app.post("/api/send-daily-report", async (req, res) => {
+-  const configuredToken = String(botSettings.globals.BOT_CONTROL_TOKEN || "");
+-  if (!configuredToken || req.body?.token !== configuredToken) {
+-    return res.status(403).json({ error: "Token laporan tidak valid." });
+-  }
+-  try {
+-    const result = await runDailyReport({
+-      skipSync: true,
+-      source: "dashboard",
+-    });
+-    if (!result?.sent) {
+-      return res.status(502).json({ error: "Laporan tidak berhasil dikirim." });
+-    }
+-    return res.json({
+-      message: "Laporan harian berhasil dikirim berdasarkan database.",
+-    });
+-  } catch (error) {
+-    console.error("[MANUAL REPORT ERROR]", error.message);
+-    return res
+-      .status(500)
+-      .json({ error: "Terjadi kesalahan saat mengirim laporan." });
+-  }
+-});
+-
+-// ENDPOINT UNTUK KICK MEMBER DARI GRUP TELEGRAM
+-app.post("/kick-telegram", async (req, res) => {
+-  const { id_telegram } = req.body;
+-  const ID_GRUP_VIP = botSettings.globals.ID_GRUP_VIP;
+-
+-  if (!id_telegram || !ID_GRUP_VIP) {
+-    return res.status(400).json({ error: "ID Telegram atau ID Grup kosong." });
+-  }
+-
+-  try {
+-    // Proses Kick: Ban member lalu langsung di-Unban agar dia terkeluar
+-    // tapi masih bisa bergabung lagi di masa depan jika di-invite.
+-    await bot.telegram.banChatMember(ID_GRUP_VIP, parseInt(id_telegram));
+-    await bot.telegram.unbanChatMember(ID_GRUP_VIP, parseInt(id_telegram));
+-
+-    console.log(`[BOT API] Berhasil kick Telegram ID: ${id_telegram}`);
+-    res.json({ status: "success", message: "Berhasil dikick dari grup." });
+-  } catch (error) {
+-    console.error(
+-      `[BOT API ERROR] Gagal kick Telegram ID ${id_telegram}:`,
+-      error.message,
+-    );
+-    res.status(500).json({ error: "Gagal mengeksekusi kick di Telegram." });
+-  }
+-});
+-
+-// ENDPOINT UNTUK RESET MEMORI USER (DARI WEB ADMIN)
+-app.post("/reset-user", async (req, res) => {
+-  const { user_id } = req.body;
+-
+-  if (!user_id) {
+-    return res.status(400).json({ error: "User ID kosong." });
+-  }
+-
+-  try {
+-    // Menghapus semua ingatan bot tentang user ini dari RAM
+-    delete userSteps[user_id];
+-    delete userTempData[user_id];
+-    delete userImagesCount[user_id];
+-
+-    if (userTimeouts[user_id]) {
+-      clearTimeout(userTimeouts[user_id].timeout);
+-      delete userTimeouts[user_id];
+-    }
+-
+-    console.log(`[BOT API] Memori user ${user_id} sukses di-reset dari Web!`);
+-    res.json({ status: "success", message: "Memori bot berhasil di-reset." });
+-  } catch (error) {
+-    console.error(
+-      `[BOT API ERROR] Gagal reset user ${user_id}:`,
+-      error.message,
+-    );
+-    res.status(500).json({ error: "Gagal mereset memori bot." });
+-  }
+-});
+-
+-// NYALAKAN SERVER EXPRESS AGAR BISA MENERIMA REQUEST DARI WEB PHP
+-app.listen(API_PORT, () => {
+-  console.log(
+-    `[EXPRESS] API Server berjalan dan siap menerima request di port ${API_PORT}`,
+-  );
+-});
+ 
+ // 2. KONEKSI DATABASE MYSQL
+ const db = mysql.createPool({
+-  host: "localhost",
+-  user: "bonichi",
+-  password: "Bonichi#2026",
+-  database: "db_hfm_bot",
++  host: process.env.DB_HOST || "127.0.0.1",
++  port: Number(process.env.DB_PORT || 3306),
++  user: process.env.DB_USER || "",
++  password: process.env.DB_PASSWORD || "",
++  database: process.env.DB_NAME || "db_hfm_bot",
+   waitForConnections: true,
+   connectionLimit: 10,
+   queueLimit: 0,
+@@ -135,7 +30,38 @@ const db = mysql.createPool({
+ let bot = null;
+ let genAI = null;
+ let botStatus = { status: "Disconnected" };
++let bulkKickLepasIbRunning = false;
++let dynamicAdminId = "";
+ let botSettings = { globals: {}, flows: [], faqs: [] };
++const CI_BASE_URL = (process.env.CI_BASE_URL || "").replace(/\/$/, "");
++if (!CI_BASE_URL) console.warn("[CONFIG] CI_BASE_URL belum dikonfigurasi.");
++const ciUrl = (path) => `${CI_BASE_URL}${path}`;
++const getBotControlToken = () =>
++  String(botSettings.globals.BOT_CONTROL_TOKEN || "").trim();
++const botControlHeaders = () => ({
++  "x-bot-control-token": getBotControlToken(),
++});
++
++async function getDynamicGroupLinks() {
++  const controlToken = getBotControlToken();
++  if (!controlToken) {
++    console.error("[GROUP LINKS ERROR] BOT_CONTROL_TOKEN belum dikonfigurasi.");
++    return {};
++  }
++
++  try {
++    const response = await axios.get(ciUrl("/client/apiGroupLinks"), {
++      timeout: 10000,
++      headers: botControlHeaders(),
++    });
++    const links = response.data?.links || {};
++    links.__admin_id = String(response.data?.admin_id || "").trim();
++    return links;
++  } catch (error) {
++    console.error("[GROUP LINKS ERROR]", error.message);
++    return {};
++  }
++}
+ 
+ const userSteps = {};
+ const userImagesCount = {};
+@@ -154,6 +80,7 @@ async function fetchConfig() {
+     const [globalRows] = await db.query(
+       "SELECT key_name, key_value FROM bot_globals",
+     );
++    botSettings.globals = {};
+     globalRows.forEach((row) => {
+       botSettings.globals[row.key_name] = row.key_value;
+     });
+@@ -186,7 +113,7 @@ async function saveChatLog(userId, sender, message) {
+     );
+ 
+     // // 2. CCTV ADMIN: Kirim tembusan riwayat chat ke Telegram Admin
+-    // const adminIdDb = botSettings.globals.ID_ADMIN || "";
++    // const adminIdDb = dynamicAdminId || "";
+     // const isAdmin = userId.toString() === adminIdDb.toString().trim();
+ 
+     // // Cegah loop (Jangan kirim notif jika Admin yang sedang mengetik ke bot)
+@@ -215,10 +142,10 @@ async function saveChatLog(userId, sender, message) {
+ async function logUserProgress(userId, userName, step) {
+   try {
+     await db.query(
+-      `INSERT INTO user_progress (user_id, user_name, phone_number, current_step, last_active)
+-       VALUES (?, ?, ?, ?, NOW()) 
+-       ON DUPLICATE KEY UPDATE user_name = VALUES(user_name), current_step = VALUES(current_step), last_active = NOW()`,
+-      [userId.toString(), userName, userId.toString(), step],
++      `INSERT INTO user_progress (user_id, user_name, phone_number, current_step, last_active, completed_at)
++       VALUES (?, ?, ?, ?, NOW(), IF(? >= 7, NOW(), NULL))
++       ON DUPLICATE KEY UPDATE user_name = VALUES(user_name), current_step = VALUES(current_step), last_active = NOW(), completed_at = IF(VALUES(current_step) >= 7, COALESCE(completed_at, NOW()), completed_at)`,
++      [userId.toString(), userName, userId.toString(), step, step],
+     );
+     console.log(
+       `[PROGRESS] ✅ User ${userName} (ID: ${userId}) tersimpan di Step ${step}`,
+@@ -228,18 +155,46 @@ async function logUserProgress(userId, userName, step) {
+   }
+ }
+ 
++async function saveTelegramGroupMembership(groupId, groupName, member, status) {
++  try {
++    const telegramId = String(member.id);
++    const displayName = [member.first_name, member.last_name].filter(Boolean).join(" ").slice(0, 150) || member.username || "Pengguna Telegram";
++    const [vipRows] = await db.query(
++      "SELECT no_wa FROM tb_member_vip WHERE id_telegram = ? LIMIT 1",
++      [telegramId],
++    );
++    const phoneNumber = vipRows[0]?.no_wa || null;
++    await db.query(
++      `INSERT INTO telegram_group_members
++        (telegram_id, phone_number, display_name, group_id, group_name, status, joined_at, left_at)
++       VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
++       ON DUPLICATE KEY UPDATE
++        phone_number = VALUES(phone_number),
++        display_name = VALUES(display_name),
++        group_name = VALUES(group_name),
++        status = VALUES(status),
++        joined_at = IF(VALUES(status) = 'active', NOW(), joined_at),
++        left_at = IF(VALUES(status) = 'left', NOW(), NULL),
++        updated_at = NOW()`,
++      [telegramId, phoneNumber, displayName, String(groupId), groupName || null, status, status === "left" ? new Date() : null],
++    );
++  } catch (error) {
++    console.error("[TELEGRAM GROUP MEMBER ERROR]", error.message);
++  }
++}
++
+ function replaceTags(msgText, userNameValue) {
+   if (!msgText) return "";
+   const callingName = userNameValue ? userNameValue : "kak";
+   return msgText
+     .replace(/{LINK_DAFTAR}/gi, botSettings.globals.LINK_DAFTAR || "")
+     .replace(/{KODE_IB}/gi, botSettings.globals.KODE_IB || "")
+-    .replace(/{ADMIN_ID}/gi, botSettings.globals.ID_ADMIN || "")
++    .replace(/{ADMIN_ID}/gi, dynamicAdminId || "")
+     .replace(/{userName}|{NAMA_USER}/gi, callingName);
+ }
+ 
+ // 5. INTEGRASI GEMINI AI
+-async function askGemini(prompt, userName) {
++async function askGemini(prompt, userName, currentStep = 1) {
+   if (!genAI) return null;
+   try {
+     const modelName =
+@@ -365,7 +320,253 @@ async function jalankanAntrian() {
+   sedangAntriBot = false;
+ }
+ 
++function hasValidControlToken(req) {
++  const expected = String(botSettings.globals.BOT_CONTROL_TOKEN || "");
++  const supplied = String(req.get("x-bot-control-token") || req.body?.token || "");
++  return expected.length > 0 && supplied.length === expected.length &&
++    require("crypto").timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
++}
++
++function requireControlToken(req, res) {
++  if (!hasValidControlToken(req)) {
++    res.status(401).json({ status: "failed", error: "Unauthorized." });
++    return false;
++  }
++  return true;
++}
++
++app.post("/api/restart-bot", (req, res) => {
++  if (!requireControlToken(req, res)) return;
++  res.json({ status: "ok", message: "Bot akan direstart oleh process manager." });
++  setImmediate(() => process.exit(0));
++});
++
++app.post("/api/send-daily-report", async (req, res) => {
++  if (!requireControlToken(req, res)) return;
++  if (!bot || !dynamicAdminId) return res.status(503).json({ status: "failed", error: "Bot atau admin belum siap." });
++  try {
++    const report = await axios.get(ciUrl("/client/apiLaporanHarian"), { timeout: 15000 });
++    const data = report.data?.data || {};
++    const message = `\ud83d\udcca Laporan harian\n\nMasuk: ${Number(data.masuk || 0)}\nKeluar sendiri: ${Number(data.keluar_sendiri || 0)}\nLepas IB/kick: ${Number(data.lepas_ib || 0)}\nTotal aktif: ${Number(data.total_aktif || 0)}`;
++    await bot.telegram.sendMessage(dynamicAdminId, message);
++    return res.json({ status: "success", data });
++  } catch (error) {
++    console.error("[REPORT ERROR]", error.message);
++    return res.status(502).json({ status: "failed", error: "Gagal mengambil atau mengirim laporan." });
++  }
++});
++
++app.post("/api/kick-lepas-ib-members", async (req, res) => {
++  // Muat ulang token dan konfigurasi grup sebelum validasi agar perubahan
++  // dari dashboard langsung berlaku pada aksi kick berikutnya.
++  await fetchConfig();
++  if (!requireControlToken(req, res)) return;
++  if (!bot) return res.status(503).json({ status: "failed", error: "Bot Telegram belum terhubung." });
++  if (bulkKickLepasIbRunning) return res.status(409).json({ status: "failed", error: "Proses kick massal sedang berjalan." });
++
++  bulkKickLepasIbRunning = true;
++  try {
++    const links = await getDynamicGroupLinks();
++    const groupId = String(links.telegram?.group_id || "").trim();
++    const groupName = String(links.telegram?.group_name || "Grup Telegram VIP");
++    if (!groupId) return res.status(409).json({ status: "failed", error: "Grup Telegram aktif belum dikonfigurasi di dashboard." });
++
++    const [candidates] = await db.query(
++      `SELECT DISTINCT TRIM(id_telegram) AS telegram_id
++       FROM tb_member_vip
++       WHERE status = 'lepas_ib'
++         AND id_telegram IS NOT NULL
++         AND TRIM(id_telegram) REGEXP '^[0-9]+$'
++         AND NOT EXISTS (
++           SELECT 1 FROM telegram_group_members AS membership
++           WHERE membership.telegram_id = TRIM(tb_member_vip.id_telegram)
++             AND membership.group_id = ? AND membership.status = 'left'
++         )
++       UNION
++       SELECT TRIM(logs.id_telegram) AS telegram_id
++       FROM tb_member_logs AS logs
++       WHERE logs.tipe_aktivitas = 'lepas_ib'
++         AND logs.id_telegram IS NOT NULL
++         AND TRIM(logs.id_telegram) REGEXP '^[0-9]+$'
++         AND NOT EXISTS (
++           SELECT 1 FROM telegram_group_members AS membership
++           WHERE membership.telegram_id = TRIM(logs.id_telegram)
++             AND membership.group_id = ? AND membership.status = 'left'
++         )
++         AND NOT EXISTS (
++           SELECT 1 FROM tb_member_logs AS newer
++           WHERE TRIM(newer.id_telegram) = TRIM(logs.id_telegram)
++             AND newer.id > logs.id
++         )
++         AND NOT EXISTS (
++           SELECT 1 FROM tb_member_vip AS current_member
++           WHERE TRIM(current_member.id_telegram) = TRIM(logs.id_telegram)
++             AND current_member.status = 'aktif'
++         )`,
++      [groupId, groupId],
++    );
++
++    const result = { status: "success", group_name: groupName, candidates: candidates.length, kicked: 0, skipped: 0, failed: 0, failed_ids: [] };
++    if (candidates.length === 0) return res.json(result);
++
++    const callTelegramWithRetry = async (action) => {
++      let retries = 0;
++      while (true) {
++        try {
++          return await action();
++        } catch (error) {
++          const retryAfter = Number(error.parameters?.retry_after || error.response?.parameters?.retry_after || 0);
++          if (retryAfter <= 0 || retries >= 3) throw error;
++          retries += 1;
++          await delay((retryAfter + 1) * 1000);
++        }
++      }
++    };
++
++    for (const candidate of candidates) {
++      const telegramId = String(candidate.telegram_id);
++      try {
++        const [stillEligible] = await db.query(
++          `SELECT 1 FROM tb_member_vip
++           WHERE status = 'lepas_ib' AND TRIM(id_telegram) = ?
++             AND NOT EXISTS (
++               SELECT 1 FROM telegram_group_members AS membership
++               WHERE membership.telegram_id = ?
++                 AND membership.group_id = ? AND membership.status = 'left'
++             )
++           UNION ALL
++           SELECT 1 FROM tb_member_logs AS logs
++           WHERE logs.tipe_aktivitas = 'lepas_ib'
++             AND TRIM(logs.id_telegram) = ?
++             AND NOT EXISTS (
++               SELECT 1 FROM tb_member_logs AS newer
++               WHERE TRIM(newer.id_telegram) = TRIM(logs.id_telegram)
++                 AND newer.id > logs.id
++             )
++             AND NOT EXISTS (
++               SELECT 1 FROM tb_member_vip AS current_member
++               WHERE TRIM(current_member.id_telegram) = ?
++                 AND current_member.status = 'aktif'
++             )
++             AND NOT EXISTS (
++               SELECT 1 FROM telegram_group_members AS membership
++               WHERE membership.telegram_id = TRIM(logs.id_telegram)
++                 AND membership.group_id = ? AND membership.status = 'left'
++             )
++           LIMIT 1`,
++          [telegramId, telegramId, groupId, telegramId, telegramId, groupId],
++        );
++        if (stillEligible.length === 0) {
++          result.skipped += 1;
++          continue;
++        }
++
++        const member = await callTelegramWithRetry(() => bot.telegram.getChatMember(groupId, telegramId));
++        if (["left", "kicked", "creator", "administrator"].includes(member.status)) {
++          if (["left", "kicked"].includes(member.status) && member.user) {
++            await saveTelegramGroupMembership(groupId, groupName, member.user, "left");
++          }
++          result.skipped += 1;
++          continue;
++        }
++        if (member.status === "restricted" && member.is_member === false) {
++          if (member.user) await saveTelegramGroupMembership(groupId, groupName, member.user, "left");
++          result.skipped += 1;
++          continue;
++        }
++        if (!["member", "restricted"].includes(member.status)) {
++          result.skipped += 1;
++          continue;
++        }
++
++        let banApplied = false;
++        try {
++          await callTelegramWithRetry(() => bot.telegram.banChatMember(groupId, telegramId));
++          banApplied = true;
++          await callTelegramWithRetry(() => bot.telegram.unbanChatMember(groupId, telegramId));
++          if (member.user) await saveTelegramGroupMembership(groupId, groupName, member.user, "left");
++        } catch (error) {
++          if (banApplied) {
++            try {
++              await callTelegramWithRetry(() => bot.telegram.unbanChatMember(groupId, telegramId));
++              if (member.user) await saveTelegramGroupMembership(groupId, groupName, member.user, "left");
++              result.kicked += 1;
++              continue;
++            } catch (cleanupError) {
++              console.error(`[BULK KICK LEPAS IB] Gagal melepas ban ${telegramId}:`, cleanupError.message);
++              error.message = `${error.message}; unban pemulihan gagal: ${cleanupError.message}`;
++            }
++          }
++          throw error;
++        }
++        result.kicked += 1;
++      } catch (error) {
++        result.failed += 1;
++        if (result.failed_ids.length < 20) result.failed_ids.push(telegramId);
++        console.error(`[BULK KICK LEPAS IB] Gagal memproses ${telegramId}:`, error.message);
++      }
++      await delay(150);
++    }
++
++    return res.json(result);
++  } catch (error) {
++    console.error("[BULK KICK LEPAS IB ERROR]", error.message);
++    return res.status(502).json({ status: "failed", error: "Gagal menjalankan kick massal. Periksa koneksi bot, izin admin Telegram, dan log bot." });
++  } finally {
++    bulkKickLepasIbRunning = false;
++  }
++});
++
++// API dashboard: kirim tombol perantara ke grup Telegram.
++app.post("/send-whatsapp-button", async (req, res) => {
++  if (!requireControlToken(req, res)) return;
++  try {
++    const sourceLinkId = Number(req.body?.source_link_id);
++    const telegramGroupId = String(req.body?.telegram_group_id || "").trim();
++    if (!sourceLinkId || !telegramGroupId)
++      return res
++        .status(400)
++        .json({
++          status: "failed",
++          error: "source_link_id dan telegram_group_id wajib diisi.",
++        });
++    if (!bot)
++      return res
++        .status(503)
++        .json({ status: "failed", error: "Bot Telegram belum terhubung." });
++    const [rows] = await db.query(
++      "SELECT id, group_name, invite_link FROM bot_group_links WHERE id = ? AND platform = 'whatsapp' AND is_active = 1 LIMIT 1",
++      [sourceLinkId],
++    );
++    if (!rows.length)
++      return res
++        .status(404)
++        .json({
++          status: "failed",
++          error: "Link WhatsApp aktif tidak ditemukan.",
++        });
++    const me = await bot.telegram.getMe();
++    const deepLink = `https://t.me/${me.username}?start=wa_${sourceLinkId}`;
++    const message = `📢 *Akses ${rows[0].group_name}*\n\nKlik tombol di bawah. Bot akan mengecek data pendaftaran Anda terlebih dahulu sebelum memberikan akses grup WhatsApp.`;
++    await bot.telegram.sendMessage(telegramGroupId, message, {
++      parse_mode: "Markdown",
++      reply_markup: {
++        inline_keyboard: [[{ text: "Gabung Grup WhatsApp", url: deepLink }]],
++      },
++      disable_web_page_preview: true,
++    });
++    res.json({ status: "success", deep_link: deepLink });
++  } catch (error) {
++    console.error("[SEND WA BUTTON ERROR]", error.message);
++    res.status(502).json({ status: "failed", error: error.message });
++  }
++});
++
+ // 8. INISIALISASI BOT & CORE ENGINE
++app.listen(API_PORT, "127.0.0.1", () => {
++  console.log(`[API] Internal bot API listening on 127.0.0.1:${API_PORT}`);
++});
++
+ async function initTelegramBot() {
+   try {
+     await fetchConfig();
+@@ -374,10 +575,85 @@ async function initTelegramBot() {
+ 
+     bot = new Telegraf(TELEGRAM_TOKEN);
+     botStatus = { status: "Connected via Database" };
+-    const ID_GRUP_VIP = botSettings.globals.ID_GRUP_VIP;
++    // Sumber tunggal konfigurasi grup: bot_group_links melalui endpoint CI4.
++    const initialGroupLinks = await getDynamicGroupLinks();
++    let ID_GRUP_VIP = initialGroupLinks.telegram?.group_id || "";
++    dynamicAdminId = initialGroupLinks.__admin_id || "";
++    if (!ID_GRUP_VIP)
++      console.warn(
++        "[GROUP CONFIG] ID grup Telegram belum diatur di menu Link Grup.",
++      );
++
++    bot.start(async (ctx) => {
++      const payload = String(ctx.startPayload || "").trim();
++      const match = payload.match(/^wa_(\d+)$/i);
++      if (!match) {
++        const userId = ctx.from?.id?.toString();
++        if (userId) {
++          userSteps[userId] ??= 1;
++          await logUserProgress(userId, ctx.from?.first_name || "Kak", userSteps[userId]);
++        }
++        return ctx.reply(
++          "Silakan kirim pesan atau gunakan tombol pendaftaran yang tersedia.",
++        );
++        return ctx.reply(
++          "Silakan kirim pesan atau gunakan tombol pendaftaran yang tersedia.",
++        );
++      }
++      const sourceLinkId = Number(match[1]);
++      const userId = ctx.from.id.toString();
++      const links = await getDynamicGroupLinks();
++      const whatsapp = links.whatsapp;
++      if (!whatsapp || Number(whatsapp.id) !== sourceLinkId)
++        return ctx.reply(
++          "❌ Link WhatsApp ini sudah tidak aktif. Silakan minta link terbaru dari admin.",
++        );
++      try {
++        const status = await axios.get(
++          ciUrl(`/client/check_status_vip/${encodeURIComponent(userId)}`),
++          { timeout: 5000, headers: botControlHeaders() },
++        );
++        if (status.data?.is_vip === true) {
++          const telegram = links.telegram;
++          if (!telegram?.invite_link || !whatsapp?.invite_link) {
++            return ctx.reply("✅ Data Anda sudah terdaftar, tetapi link grup Telegram/WhatsApp belum lengkap. Silakan hubungi admin.");
++          }
++          userSteps[userId] = 7;
++          await logUserProgress(userId, ctx.from?.first_name || "Kak", 7);
++          return ctx.reply(
++            "✅ Data Anda sudah tervalidasi. Silakan pilih link untuk bergabung ke kedua grup:",
++            {
++              reply_markup: {
++                inline_keyboard: [
++                  [{ text: `Masuk ${telegram.group_name || "Grup Telegram"}`, url: telegram.invite_link }],
++                  [{ text: `Masuk ${whatsapp.group_name || "Grup WhatsApp"}`, url: whatsapp.invite_link }],
++                ],
++              },
++            },
++          );
++        }
++      } catch (error) {
++        console.error("[WA DEEPLINK STATUS ERROR]", error.message);
++        return ctx.reply(
++          "❌ Sistem sedang tidak dapat mengecek data Anda. Silakan coba lagi beberapa saat.",
++        );
++      }
++      userSteps[userId] = 5;
++      userTempData[userId] = {
++        id_hfm: null,
++        registration_source: "telegram_whatsapp_button",
++        registration_source_id: sourceLinkId,
++      };
++      const prompt = `Data Anda belum terdaftar.\n\nSilakan kirim ID Trading terlebih dahulu. Bot akan memvalidasinya, lalu meminta Nama, Nomor WhatsApp, dan Email jika ID valid.`;
++      await logUserProgress(userId, ctx.from?.first_name || "Kak", userSteps[userId]);
++      await ctx.reply(prompt);
++      await saveChatLog(userId, "bot", prompt);
++    });
+ 
+     bot.on(["text", "photo"], async (ctx) => {
+       antrianBot.push(async () => {
++        let trackedUserId = "";
++        let trackedUserName = "";
+         try {
+           const msg = ctx.message;
+           const chatId = ctx.chat.id.toString();
+@@ -393,11 +669,17 @@ async function initTelegramBot() {
+           await saveChatLog(userId, "user", textMessage || "[Photo]");
+           await ctx.sendChatAction("typing");
+ 
++          const latestGroupLinks = await getDynamicGroupLinks();
++          if (latestGroupLinks.telegram?.group_id)
++            ID_GRUP_VIP = latestGroupLinks.telegram.group_id;
++          if (latestGroupLinks.__admin_id)
++            dynamicAdminId = latestGroupLinks.__admin_id;
++
+           if (typeof userSteps[userId] === "undefined") userSteps[userId] = 1;
+           let currentStep = userSteps[userId];
+ 
+           // FITUR ADMIN: AMBIL ALIH CHAT (BALAS MANUAL)
+-          const adminIdDb = botSettings.globals.ID_ADMIN || "";
++          const adminIdDb = dynamicAdminId || "";
+           const isAdmin = userId.toString() === adminIdDb.toString().trim();
+ 
+           if (isAdmin && textMessage.startsWith("/balas ")) {
+@@ -429,10 +711,18 @@ async function initTelegramBot() {
+             return;
+           }
+ 
++          if (!isAdmin) {
++            trackedUserId = userId.toString();
++            trackedUserName = userName;
++          }
++
+           // 1. CEK STATUS VIP & MEMBER LAMA
+           try {
+-            const urlCek = `http://103.89.4.144/bot_wa/client/check_status_vip/${userId}`;
+-            const checkStatus = await axios.get(urlCek, { timeout: 5000 });
++            const urlCek = ciUrl(`/client/check_status_vip/${encodeURIComponent(userId)}`);
++            const checkStatus = await axios.get(urlCek, {
++              timeout: 5000,
++              headers: botControlHeaders(),
++            });
+ 
+             if (checkStatus.data && checkStatus.data.is_vip === true) {
+               let isMember = false;
+@@ -452,7 +742,7 @@ async function initTelegramBot() {
+               }
+ 
+               if (isMember) {
+-                const adminIdDb = botSettings.globals.ID_ADMIN || "";
++                const adminIdDb = dynamicAdminId || "";
+                 if (!isAdmin) {
+                   const vipReply = `Halo kak ${userName}! Kakak kan sudah tergabung di grup VIP kita nih 🎉\n\nJika ada pertanyaan, kendala seputar trading, atau butuh panduan lebih lanjut, silakan langsung hubungi Admin Utama ya!\n\n👉 [Klik di sini untuk Chat Admin Utama](tg://user?id=${adminIdDb})`;
+                   await ctx.reply(vipReply, { parse_mode: "Markdown" });
+@@ -461,16 +751,17 @@ async function initTelegramBot() {
+                 startTimeoutTimer(userId, userName);
+                 return;
+               } else {
+-                const inviteLink = await bot.telegram.createChatInviteLink(
+-                  ID_GRUP_VIP,
+-                  {
+-                    expire_date: Math.floor(Date.now() / 1000) + 60,
+-                    member_limit: 1,
+-                  },
+-                );
+-
++                const links = await getDynamicGroupLinks();
++                const telegramLink = links.telegram?.invite_link || "";
++                const whatsappLink = links.whatsapp?.invite_link || "";
++                if (!telegramLink || !whatsappLink) {
++                  await ctx.reply("Status VIP Anda aktif, tetapi kedua link grup belum dikonfigurasi aktif di dashboard. Silakan hubungi admin.");
++                  userSteps[userId] = 7;
++                  startTimeoutTimer(userId, userName);
++                  return;
++                }
+                 const sentMsg = await ctx.reply(
+-                  `Halo kak ${userName}! Status VIP kakak sudah aktif kok 🎉\n\nIni link grup VIP yang baru untuk kakak ya. Yuk buruan diklik sebelum hilang lagi!\n👉 ${inviteLink.invite_link}\n\n_(Pesan otomatis ditarik dlm 1 menit)_`,
++                  `Halo kak ${userName}! Status VIP kakak sudah aktif kok 🎉\n\nSilakan bergabung ke kedua grup VIP:\n\nTelegram:\n👉 ${telegramLink}\n\nWhatsApp:\n👉 ${whatsappLink}\n\n_(Pesan otomatis ditarik dlm 1 menit)_`,
+                 );
+ 
+                 setTimeout(async () => {
+@@ -488,118 +779,134 @@ async function initTelegramBot() {
+             }
+           } catch (e) {}
+ 
+-          // 1.5 PENANGANAN FORMULIR & ID TRADING (AUTO DETEKSI DARI STEP MANA PUN)
+-          const namaMatch = textMessage.match(/Nama\s*:\s*(.+)/i);
+-          const waMatch = textMessage.match(
+-            /(?:No wa aktif|No wa|Nomor wa|WA)\s*:\s*(.+)/i,
+-          );
+-          const emailMatch = textMessage.match(/(?:Email|E-mail)\s*:\s*(.+)/i);
+-          const idTradingMatch = textMessage.match(/\b\d{5,15}\b/);
+-
+-          const isMengisiForm = namaMatch && waMatch && emailMatch;
+-
+-          // JIKA USER MENGIRIM FORM LENGKAP
+-          if (isMengisiForm) {
+-            // PERBAIKAN PERMANEN: Cek apakah ID sudah tervalidasi di memori.
+-            // Jika belum ada/kosong karena user curi start, tolak formnya!
+-            if (!userTempData[userId]) {
+-              await ctx.reply(
+-                "⚠️ Maaf Kak, sistem belum selesai memverifikasi ID Trading Kakak.\n\nSilakan ketik angka ID Trading-nya saja dan tunggu sampai ada balasan 'Berhasil / Valid' dari sistem, baru Kakak kirimkan formulir ini ya! 🙏",
+-              );
+-              startTimeoutTimer(userId, userName);
+-              return;
+-            }
+-
+-            // Jika memori sudah terisi, gunakan HANYA id dari memori tersebut.
+-            const dataForm = {
+-              nama: namaMatch[1].trim(),
+-              no_wa: waMatch[1].trim(),
+-              email: emailMatch[1].trim(),
+-              id_telegram: userId.toString(),
+-              id_hfm: userTempData[userId],
+-            };
+-
+-            const loadFormMsg = await ctx.reply(
+-              "⏳ Menyimpan data dan menyiapkan link VIP...",
+-            );
+-
+-            try {
+-              const resSave = await axios.post(
+-                "http://103.89.4.144/bot_wa/client/simpanMemberForm",
+-                dataForm,
++          // 1.5 PENANGANAN FORMULIR (STEP 7)
++          if (currentStep === 7) {
++            const text = textMessage;
++
++            const namaMatch = text.match(/Nama\s*:\s*(.+)/i);
++            const waMatch = text.match(/No wa aktif\s*:\s*(.+)/i);
++            const emailMatch = text.match(/email\s*:\s*(.+)/i);
++
++            if (namaMatch && waMatch && emailMatch) {
++              const dataForm = {
++                nama: namaMatch[1].trim(),
++                no_wa: waMatch[1].trim(),
++                email: emailMatch[1].trim(),
++                id_telegram: userId.toString(),
++                id_hfm:
++                  typeof userTempData[userId] === "object"
++                    ? userTempData[userId].id_hfm
++                    : userTempData[userId] || "",
++                registration_source:
++                  typeof userTempData[userId] === "object"
++                    ? userTempData[userId].registration_source
++                    : null,
++                registration_source_id:
++                  typeof userTempData[userId] === "object"
++                    ? userTempData[userId].registration_source_id
++                    : null,
++              };
++
++              const loadFormMsg = await ctx.reply(
++                "⏳ Menyimpan data dan menyiapkan link VIP...",
+               );
+ 
+-              if (resSave.data.status === "sukses") {
+-                const inviteLink = await bot.telegram.createChatInviteLink(
+-                  botSettings.globals.ID_GRUP_VIP,
+-                  {
+-                    expire_date: Math.floor(Date.now() / 1000) + 60,
+-                    member_limit: 1,
+-                  },
++              try {
++                const resSave = await axios.post(
++                  ciUrl("/client/simpanMemberForm"),
++                  dataForm,
+                 );
+ 
+-                const suksesMsg = `Selamat kak ${dataForm.nama}! Data berhasil diverifikasi.\n\nSilakan bergabung melalui link Grup VIP di bawah ini ya:\n👉 ${inviteLink.invite_link}\n\n_(Pesan otomatis ditarik dlm 1 menit)_`;
++                if (resSave.data.status === "sukses") {
++                  const links = await getDynamicGroupLinks();
++                  const telegramLink = links.telegram?.invite_link || "";
++                  const whatsappLink = links.whatsapp?.invite_link || "";
++                  const suksesMsg = telegramLink && whatsappLink
++                    ? `Selamat kak ${dataForm.nama}! Data berhasil diverifikasi.\n\nSilakan bergabung ke kedua grup VIP:\n\nTelegram:\n👉 ${telegramLink}\n\nWhatsApp:\n👉 ${whatsappLink}\n\n_(Pesan otomatis ditarik dlm 1 menit)_`
++                    : `Selamat kak ${dataForm.nama}! Data berhasil diverifikasi, tetapi kedua link grup belum dikonfigurasi aktif di dashboard. Silakan hubungi admin.`;
++                  const sentMsg = await ctx.telegram.editMessageText(
++                    ctx.chat.id,
++                    loadFormMsg.message_id,
++                    undefined,
++                    suksesMsg,
++                  );
++                  await saveChatLog(
++                    userId,
++                    "bot",
++                    "Berhasil registrasi form dan kirim link.",
++                  );
+ 
+-                const sentMsg = await ctx.telegram.editMessageText(
+-                  ctx.chat.id,
+-                  loadFormMsg.message_id,
+-                  undefined,
+-                  suksesMsg,
+-                );
+-                await saveChatLog(
+-                  userId,
+-                  "bot",
+-                  "Berhasil registrasi form dan kirim link.",
+-                );
++                  userSteps[userId] = 7;
++                  delete userTempData[userId];
++
++                  setTimeout(async () => {
++                    try {
++                      await bot.telegram.deleteMessage(
++                        userId,
++                        sentMsg.message_id,
++                      );
++                    } catch (e) {}
++                  }, 60000);
++                } else {
++                  await ctx.telegram.editMessageText(
++                    ctx.chat.id,
++                    loadFormMsg.message_id,
++                    undefined,
++                    "❌ Gagal menyimpan data: " + resSave.data.pesan,
++                  );
++                }
++              } catch (err) {
++                const errorDetail =
++                  err.response && err.response.data
++                    ? typeof err.response.data === "string"
++                      ? err.response.data.substring(0, 150)
++                      : JSON.stringify(err.response.data)
++                    : err.message;
+ 
+-                userSteps[userId] = 7;
+-                delete userTempData[userId];
+-                await logUserProgress(userId, userName, 7);
++                const failMsg = `❌ Sistem Gagal Menyimpan.\n\n[DEBUG ADMIN]\nPenyebab: ${errorDetail}`;
+ 
+-                setTimeout(async () => {
+-                  try {
+-                    await bot.telegram.deleteMessage(
+-                      userId,
+-                      sentMsg.message_id,
+-                    );
+-                  } catch (e) {}
+-                }, 60000);
+-              } else {
+-                await ctx.telegram.editMessageText(
+-                  ctx.chat.id,
+-                  loadFormMsg.message_id,
+-                  undefined,
+-                  "❌ Gagal menyimpan data: " + resSave.data.pesan,
+-                );
++                try {
++                  await ctx.telegram.editMessageText(
++                    ctx.chat.id,
++                    loadFormMsg.message_id,
++                    undefined,
++                    failMsg,
++                  );
++                } catch (e) {
++                  await ctx.reply(failMsg);
++                }
+               }
+-            } catch (err) {
+-              const errorDetail =
+-                err.response && err.response.data
+-                  ? typeof err.response.data === "string"
+-                    ? err.response.data.substring(0, 150)
+-                    : JSON.stringify(err.response.data)
+-                  : err.message;
+-              await ctx.telegram.editMessageText(
+-                ctx.chat.id,
+-                loadFormMsg.message_id,
+-                undefined,
+-                `❌ Sistem Gagal Menyimpan.\n\n[DEBUG ADMIN]\nPenyebab: ${errorDetail}`,
+-              );
++            } else {
++              const errorFormat =
++                "❌ Format tidak sesuai atau ada baris yang hilang kak.\n\nSilakan *Copy (Salin)* format sebelumnya, tempel di sini, lalu isi dengan lengkap ya!";
++              await ctx.reply(errorFormat);
++              await saveChatLog(userId, "bot", errorFormat);
+             }
+             startTimeoutTimer(userId, userName);
+             return;
+           }
+ 
+-          // 2. CEK INPUT ANGKA ID TRADING MANUAL (HANYA ID, TANPA FORM)
+-          if (idTradingMatch && !isMengisiForm) {
+-            const adminIdDb = botSettings.globals.ID_ADMIN || "";
++          // 2. CEK INPUT ANGKA ID TRADING MANUAL
++          const idTradingMatch = textMessage.match(/\b\d{5,}\b/);
++
++          if (idTradingMatch) {
++            const adminIdDb = dynamicAdminId || "";
+             const isAdmin = userId.toString() === adminIdDb.toString().trim();
+-            const idTrading = idTradingMatch[0];
+ 
++            if (!isAdmin && currentStep < 5) {
++              const warningMsg = `Eits, tunggu dulu kak ${userName}! Kakak belum sampai di tahap penyerahan ID Trading nih 😅\n\nYuk ikuti panduan step-by-step sebelumnya ya!`;
++              await ctx.reply(warningMsg);
++              await saveChatLog(userId, "bot", warningMsg);
++              startTimeoutTimer(userId, userName);
++              return;
++            }
++
++            const idTrading = idTradingMatch[0];
+             const loadText = isAdmin
+               ? `👨‍💻 Siap Min! Mengecek status ID Trading (${idTrading}) ke server...`
+-              : `Mengecek ID Trading (${idTrading}) ke server, tunggu sebentar ya kak ${userName}... ⏳`;
++              : `Oke kak ${userName}, aku cek dulu ya ID Trading (${idTrading})...`;
+ 
++            // PERBAIKAN: Simpan object pesan balasan ke sentLoadMsg
+             const sentLoadMsg = await ctx.reply(loadText);
+             await saveChatLog(userId, "bot", loadText);
+ 
+@@ -607,13 +914,13 @@ async function initTelegramBot() {
+ 
+             try {
+               const resCek = await axios.get(
+-                `http://103.89.4.144/bot_wa/client/cekHfm/${idTrading}/${apiUserId}`,
++                ciUrl(`/client/cekHfm/${encodeURIComponent(idTrading)}/${encodeURIComponent(apiUserId)}`),
+               );
+               let finalMsg = "";
+ 
+               if (resCek.data.status === "valid_sempurna") {
+                 if (isAdmin) {
+-                  finalMsg = `✅ *[ADMIN INFO]*\nID Trading \`${idTrading}\` statusnya *VALID* dan terdeteksi di IB BOSSCUAN!`;
++                  finalMsg = `✅ *[ADMIN INFO]*\nID Trading \`${idTrading}\` statusnya *VALID* dan terdeteksi di bawah IB BOSSCUAN!`;
+                   await ctx.telegram.editMessageText(
+                     ctx.chat.id,
+                     sentLoadMsg.message_id,
+@@ -621,60 +928,88 @@ async function initTelegramBot() {
+                     finalMsg,
+                     { parse_mode: "Markdown" },
+                   );
++                  await saveChatLog(userId, "bot", "Admin berhasil cek ID.");
+                 } else {
+                   userSteps[userId] = 7;
+-                  userTempData[userId] = idTrading;
+-                  finalMsg = `✅ **Selamat kak ${userName}!**\n\nID akun trading (${idTrading}) sudah terverifikasi dan berada di bawah BO$$CUAN 🎉\n\nSekarang silakan lengkapi data Kakak di bawah ini:\n\nNama :\nNo wa aktif :\nemail :\n\n_(Copy tulisan di atas, isi, lalu kirim ke sini agar kami bisa mengundang Kakak ke grup VIP Warga Avatar)_`;
++                  const previousSource =
++                    typeof userTempData[userId] === "object"
++                      ? userTempData[userId]
++                      : {};
++                  userTempData[userId] = {
++                    ...previousSource,
++                    id_hfm: idTrading,
++                  };
++                  finalMsg = `Baik. ID akun trading sudah under BO$$CUAN...\nSekarang silahkan lengkapi data anda dibawah ini.\n\nNama :\nNo wa aktif :\nemail :\n\nSetelah anda melengkapi data diatas, kami akan mengundang anda untuk join di grup VIP WARGA AVATAR by Papip Celebes`;
+                   await ctx.telegram.editMessageText(
+                     ctx.chat.id,
+                     sentLoadMsg.message_id,
+                     undefined,
+                     finalMsg,
+-                    { parse_mode: "Markdown" },
+                   );
+-                  await logUserProgress(userId, userName, 7);
++                  await saveChatLog(userId, "bot", "Mengirim form registrasi.");
+                 }
+-                startTimeoutTimer(userId, userName);
+-                return;
+               } else if (resCek.data.status === "id_diklaim_orang_lain") {
+                 finalMsg = isAdmin
+                   ? `⚠️ *[ADMIN INFO]*\nID \`${idTrading}\` *SUDAH DIKLAIM* oleh nomor ${resCek.data.no_tersensor}.`
+                   : `❌ Maaf kak ${userName}, ID Trading ${idTrading} sudah diklaim oleh member lain dengan nomor ${resCek.data.no_tersensor}.`;
++                await ctx.telegram.editMessageText(
++                  ctx.chat.id,
++                  sentLoadMsg.message_id,
++                  undefined,
++                  finalMsg,
++                  { parse_mode: isAdmin ? "Markdown" : undefined },
++                );
++                await saveChatLog(userId, "bot", finalMsg);
+               } else if (resCek.data.status === "kurang_deposit") {
+-                finalMsg = isAdmin
++                const depoPesan = isAdmin
+                   ? `⚠️ *[ADMIN INFO]*\nID \`${idTrading}\` terdaftar, tapi *DEPOSIT KURANG*.\n_Pesan:_ ${resCek.data.pesan}`
+-                  : `⚠️ ${resCek.data.pesan}\n\n💡 _Silakan lakukan deposit terlebih dahulu, lalu ketik ulang ID Kakak di sini jika sudah beres!_`;
++                  : `⚠️ ${resCek.data.pesan}\n\n💡 _Kalo Kakak belum tau caranya, cukup ketik_ *"cara deposit"* _biar aku kirimin video panduannya ya!_\n\nKalo udah berhasil deposit, silakan kirim ulang **Screenshot Akunnya** atau ketik lagi angka ID-nya ke sini biar aku cek ulang! 📸`;
++
++                await ctx.telegram.editMessageText(
++                  ctx.chat.id,
++                  sentLoadMsg.message_id,
++                  undefined,
++                  depoPesan,
++                  { parse_mode: isAdmin ? "Markdown" : undefined },
++                );
++                await saveChatLog(userId, "bot", depoPesan);
+               } else {
+                 finalMsg = isAdmin
+                   ? `❌ *[ADMIN INFO]*\nID \`${idTrading}\` *TIDAK VALID* atau tidak terdaftar di IB kita.`
+                   : resCek.data.pesan ||
+-                    "❌ ID Tidak Valid atau belum masuk di bawah IB BOSSCUAN.";
++                    "❌ ID Tidak Valid atau tidak ditemukan.";
++                await ctx.telegram.editMessageText(
++                  ctx.chat.id,
++                  sentLoadMsg.message_id,
++                  undefined,
++                  finalMsg,
++                  { parse_mode: isAdmin ? "Markdown" : undefined },
++                );
++                await saveChatLog(userId, "bot", finalMsg);
+               }
++            } catch (err) {
++              const errorDetail = err.response
++                ? JSON.stringify(err.response.data)
++                : err.message;
++              let errMsg =
++                "❌ Server API lagi gangguan kak. Coba lagi nanti ya.";
++              if (isAdmin)
++                errMsg += `\n\n👨‍💻 *[DEBUG ADMIN]*\n_Gagal mengecek ID ${idTrading}_\n*Penyebab:* ${errorDetail}`;
+ 
+               await ctx.telegram.editMessageText(
+                 ctx.chat.id,
+                 sentLoadMsg.message_id,
+                 undefined,
+-                finalMsg,
++                errMsg,
+                 { parse_mode: "Markdown" },
+               );
+-              await saveChatLog(userId, "bot", finalMsg);
+-              startTimeoutTimer(userId, userName);
+-              return;
+-            } catch (err) {
+-              await ctx.telegram.editMessageText(
+-                ctx.chat.id,
+-                sentLoadMsg.message_id,
+-                undefined,
+-                "❌ Server API lagi gangguan kak. Coba beberapa saat lagi ya.",
+-              );
+-              startTimeoutTimer(userId, userName);
+-              return;
+             }
++            startTimeoutTimer(userId, userName);
++            return;
+           }
+ 
+           // ==========================================
+-          // 3. OCR GAMBAR SCREENSHOT (PRIORITAS ID)
++          // 3. OCR GAMBAR SCREENSHOT
+           // ==========================================
+           if (msg.photo) {
+             try {
+@@ -690,18 +1025,73 @@ async function initTelegramBot() {
+                 Buffer.from(responseImg.data),
+                 "eng",
+               );
+-
+               const ocrDetectedText = ocrRes.data.text || "";
+               const ocrDetectedLower = ocrDetectedText.toLowerCase();
+ 
++              // URUTAN PRIORITAS DETEKSI GAMBAR OCR
++
+               // Tarik Angka ID sedini mungkin dari gambar!
+-              const ocrMatches = ocrDetectedText.match(/\b\d{5,15}\b/g);
++              const ocrMatches = ocrDetectedText.match(/\b\d{5,}\b/g);
+               const uniqueIds = ocrMatches ? [...new Set(ocrMatches)] : [];
+               const detectedId = uniqueIds.length === 1 ? uniqueIds[0] : "";
+               const hasMultipleIds = uniqueIds.length > 1;
+ 
+-              // PRIORITAS 1: JIKA ADA 1 ANGKA ID TRADING TERDETEKSI -> LANGSUNG CEK API!
+-              if (detectedId) {
++              // 1. CEK SS PINDAH IB BERHASIL (Lanjut ke Step 5: Arsip)
++              if (
++                ocrDetectedLower.includes("pembaruan berhasil") ||
++                ocrDetectedLower.includes("update successful") ||
++                ocrDetectedLower.includes(
++                  "this campaign has already been assigned",
++                ) ||
++                ocrDetectedLower.includes("kampanye ini sudah ditetapkan")
++              ) {
++                const successMsg = `Mantap kak ${userName}, bukti pindah IB berhasil terdeteksi!\n\nSelanjutnya : \n\n1. arsipkan akun trading lamanya\n2. lalu buka akun trading baru ( bebas ) Pastikan Masukin kode IB g0olqxh5h3 di bagian introducing broker\n3. Lalu deposit minimal $10`;
++
++                try {
++                  await ctx.telegram.deleteMessage(
++                    ctx.chat.id,
++                    loadMsg.message_id,
++                  );
++                } catch (e) {}
++                await sendSmartMessage(ctx, successMsg);
++                userSteps[userId] = 5;
++              }
++
++              // 2. CEK SS ARSIP BERHASIL (Lanjut ke Step 6: Buka MT5 & Deposit)
++              else if (
++                ocrDetectedLower.includes("arsip") &&
++                (ocrDetectedLower.includes("berhasil") ||
++                  ocrDetectedLower.includes("sukses"))
++              ) {
++                const arsipMsg = `Mantap kak ${userName}, udah berhasil arsip akun!\n\nSekarang lanjut ke langkah berikutnya:\n1. Buka akun trading Live MT5 (bebas pilih tipe)\n2. Pastikan memasukkan Kode IB g0olqxh5h3\n3. Deposit minimal Rp100.000\n\n⚠️ Kalo udah deposit, Ketik Angka Akun ID trading barunya ke sini ya kak!\n\n[GAMBAR: ss_akunsayaapk]\n\n[GAMBAR: ss_akunsaya]`;
++
++                try {
++                  await ctx.telegram.deleteMessage(
++                    ctx.chat.id,
++                    loadMsg.message_id,
++                  );
++                } catch (e) {}
++                await sendSmartMessage(ctx, arsipMsg);
++                userSteps[userId] = 6;
++              }
++
++              // 3. JIKA ADA LEBIH DARI 1 ID TRADING (MULTIPLE IDs) -> SURUH ARSIPKAN
++              else if (hasMultipleIds) {
++                try {
++                  await ctx.telegram.deleteMessage(
++                    ctx.chat.id,
++                    loadMsg.message_id,
++                  );
++                } catch (e) {}
++
++                const multiIdMsg = `Waduh kak ${userName}, aku mendeteksi ada **Lebih dari 1 Akun Trading** di gambar ini nih! 😅\n\nBiar sistem nggak bingung dan datanya valid, Kakak wajib **MENGARSIPKAN** akun-akun yang lama dulu ya (sisakan 1 akun saja).\n\nCara Arsip Akun:\n1. G boleh ada Posisi yg berjalan\n2. Saldo Wajib 0 (pindahkan ke wallet dulu)\n3. Klik Akun yg mau diarsipkan, lalu klik 'Arsipkan'\n\n[VIDEO: arsipkan_akun]\n\nKalo udah diarsipkan semua, kirim Screenshot buktinya ke sini ya kak!`;
++
++                await sendSmartMessage(ctx, multiIdMsg);
++                userSteps[userId] = 5; // Arahkan ke Tahap Arsip
++              }
++
++              // 4. JIKA HANYA ADA TEPAT 1 ANGKA ID TRADING -> WAJIB CEK API DULU!
++              else if (detectedId) {
+                 try {
+                   await ctx.telegram.deleteMessage(
+                     ctx.chat.id,
+@@ -714,22 +1104,20 @@ async function initTelegramBot() {
+ 
+                 try {
+                   const resCek = await axios.get(
+-                    `http://103.89.4.144/bot_wa/client/cekHfm/${detectedId}/CHECK_ONLY`,
++                    ciUrl(`/client/cekHfm/${encodeURIComponent(detectedId)}/CHECK_ONLY`),
+                   );
+ 
+                   if (resCek.data.status === "valid_sempurna") {
+-                    userSteps[userId] = 7;
++                    userSteps[userId] = 7; // Lolos API!
+                     userTempData[userId] = detectedId;
+-                    const finalMsg = `✅ **Selamat kak ${userName}!**\n\nID akun trading (${detectedId}) sudah lolos verifikasi dan deposit masuk under BO$$CUAN 🎉\n\nSekarang silakan lengkapi data Kakak di bawah ini:\n\nNama :\nNo wa aktif :\nemail :\n\n_(Copy tulisan di atas, isi, lalu kirim ke sini untuk mendapatkan link VIP)_`;
++                    const finalMsg = `Selamat kak ${userName}! Akun dan deposit sudah masuk under BO$$CUAN 🎉\n\nSekarang silahkan lengkapi data anda dibawah ini.\n\nNama :\nNo wa aktif :\nemail :\n\nSetelah melengkapi data, kami akan mengundang anda ke grup VIP WARGA AVATAR.`;
+ 
+                     await ctx.telegram.editMessageText(
+                       ctx.chat.id,
+                       cekMsg.message_id,
+                       undefined,
+                       finalMsg,
+-                      { parse_mode: "Markdown" },
+                     );
+-                    await logUserProgress(userId, userName, 7);
+                   } else if (resCek.data.status === "id_diklaim_orang_lain") {
+                     await ctx.telegram.editMessageText(
+                       ctx.chat.id,
+@@ -738,86 +1126,46 @@ async function initTelegramBot() {
+                       `❌ Maaf kak, ID Trading ${detectedId} sudah diklaim oleh member lain dengan nomor ${resCek.data.no_tersensor}.`,
+                     );
+                   } else if (resCek.data.status === "kurang_deposit") {
++                    const depoPesan = `⚠️ ${resCek.data.pesan}\n\n💡 _Kalo Kakak belum tau caranya, cukup ketik_ *"cara deposit"* _biar aku kirimin video panduannya ya!_\n\nKalo udah berhasil deposit, silakan **kirim ulang Screenshot Akunnya** atau ketik lagi angka ID-nya ke sini biar aku cek ulang! 📸`;
++
+                     await ctx.telegram.editMessageText(
+                       ctx.chat.id,
+                       cekMsg.message_id,
+                       undefined,
+-                      `⚠️ ${resCek.data.pesan}\n\n💡 _Silakan deposit terlebih dahulu, lalu kirim ulang Screenshot-nya ke sini ya!_`,
++                      depoPesan,
+                       { parse_mode: "Markdown" },
+                     );
+                   } else {
++                    // ID TIDAK VALID / BELUM DI BAWAH IB -> KASIH PANDUAN PINDAH IB
+                     const invalidMsg = `❌ Maaf kak ${userName}, ID Trading ${detectedId} belum terdaftar di bawah IB kita.\n\nJika Kakak belum pindah IB, yuk ikuti panduan berikut:\n\nLogin via Web: http://hftidtrade.com\n\nCara Pindah IB:\n1. Klik Dompet Saya\n2. Klik Aksi Wallet\n3. Klik set ID Mitra & Kampanye\n4. Ketik g0olqxh5h3\n5. Klik Tambah & tetapkan Ulang.\n\n[VIDEO: pindah_ib]`;
++
+                     await ctx.telegram
+                       .deleteMessage(ctx.chat.id, cekMsg.message_id)
+                       .catch(() => {});
+                     await sendSmartMessage(ctx, invalidMsg);
+-                    userSteps[userId] = 4;
++                    userSteps[userId] = 4; // Kembalikan ke Tahap Pindah IB
+                   }
+-                  startTimeoutTimer(userId, userName);
+-                  return;
+                 } catch (err) {
++                  const errorDetail = err.response
++                    ? JSON.stringify(err.response.data)
++                    : err.message;
++                  let errMsg =
++                    "❌ Server API lagi gangguan kak. Coba lagi nanti ya.";
++                  const adminIdDb = dynamicAdminId || "";
++                  if (userId.toString() === adminIdDb.toString().trim()) {
++                    errMsg += `\n\n👨‍💻 *[DEBUG ADMIN]*\n_Gagal mengecek ID ${detectedId}_\n*Penyebab:* ${errorDetail}`;
++                  }
+                   await ctx.telegram.editMessageText(
+                     ctx.chat.id,
+                     cekMsg.message_id,
+                     undefined,
+-                    "❌ Server API lagi gangguan kak. Coba lagi nanti ya.",
++                    errMsg,
++                    { parse_mode: "Markdown" },
+                   );
+-                  startTimeoutTimer(userId, userName);
+-                  return;
+                 }
+               }
+ 
+-              // PRIORITAS 2: JIKA GAMBAR ADA BANYAK ID -> SURUH ARSIPKAN
+-              else if (hasMultipleIds) {
+-                try {
+-                  await ctx.telegram.deleteMessage(
+-                    ctx.chat.id,
+-                    loadMsg.message_id,
+-                  );
+-                } catch (e) {}
+-                const multiIdMsg = `Waduh kak ${userName}, aku mendeteksi ada **Lebih dari 1 Akun Trading** di gambar ini nih! 😅\n\nBiar sistem nggak bingung dan datanya valid, Kakak wajib **MENGARSIPKAN** akun-akun yang lama dulu ya (sisakan 1 akun saja).\n\nCara Arsip Akun:\n1. G boleh ada Posisi yg berjalan\n2. Saldo Wajib 0 (pindahkan ke wallet dulu)\n3. Klik Akun yg mau diarsipkan, lalu klik 'Arsipkan'\n\n[VIDEO: arsipkan_akun]\n\nKalo udah diarsipkan semua, kirim Screenshot buktinya ke sini ya kak!`;
+-                await sendSmartMessage(ctx, multiIdMsg);
+-                userSteps[userId] = 5;
+-              }
+-
+-              // PRIORITAS 3: CEK SS PINDAH IB BERHASIL
+-              else if (
+-                ocrDetectedLower.includes("pembaruan berhasil") ||
+-                ocrDetectedLower.includes("update successful") ||
+-                ocrDetectedLower.includes(
+-                  "this campaign has already been assigned",
+-                ) ||
+-                ocrDetectedLower.includes("kampanye ini sudah ditetapkan")
+-              ) {
+-                try {
+-                  await ctx.telegram.deleteMessage(
+-                    ctx.chat.id,
+-                    loadMsg.message_id,
+-                  );
+-                } catch (e) {}
+-                const successMsg = `Mantap kak ${userName}, bukti pindah IB berhasil terdeteksi!\n\nSelanjutnya : \n\n1. arsipkan akun trading lamanya\n2. lalu buka akun trading baru ( bebas ) Pastikan Masukin kode IB g0olqxh5h3 di bagian introducing broker\n3. Lalu deposit minimal $10`;
+-                await sendSmartMessage(ctx, successMsg);
+-                userSteps[userId] = 5;
+-              }
+-
+-              // PRIORITAS 4: CEK SS ARSIP BERHASIL
+-              else if (
+-                ocrDetectedLower.includes("arsip") &&
+-                (ocrDetectedLower.includes("berhasil") ||
+-                  ocrDetectedLower.includes("sukses"))
+-              ) {
+-                try {
+-                  await ctx.telegram.deleteMessage(
+-                    ctx.chat.id,
+-                    loadMsg.message_id,
+-                  );
+-                } catch (e) {}
+-                const arsipMsg = `Mantap kak ${userName}, udah berhasil arsip akun!\n\nSekarang lanjut ke langkah berikutnya:\n1. Buka akun trading Live MT5 (bebas pilih tipe)\n2. Pastikan memasukkan Kode IB g0olqxh5h3\n3. Deposit minimal Rp100.000\n\n⚠️ Kalo udah deposit, Ketik Angka Akun ID trading barunya ke sini ya kak!\n\n[GAMBAR: ss_akunsayaapk]\n\n[GAMBAR: ss_akunsaya]`;
+-                await sendSmartMessage(ctx, arsipMsg);
+-                userSteps[userId] = 6;
+-              }
+-
+-              // PRIORITAS 5: KEYWORD TAMPILAN AKUN (BURAM/TIDAK ADA ID)
++              // 5. JIKA GAMBAR TIDAK ADA ANGKA ID (BURAM), TAPI ADA KEYWORD TAMPILAN AKUN
+               else if (
+                 (ocrDetectedLower.includes("akun langsung") &&
+                   ocrDetectedLower.includes("berdagang")) ||
+@@ -831,12 +1179,14 @@ async function initTelegramBot() {
+                     loadMsg.message_id,
+                   );
+                 } catch (e) {}
++
+                 const pindahIbMsg = `Mantap kak ${userName}, screenshot akunnya sudah terbaca!\n\nSekarang tinggal pindah IB aja ke under BOSSCUAN. Login via Web menggunakan Link Berikut : http://hftidtrade.com\n\nCara Pindah IB:\n1. Klik Dompet Saya\n2. Klik Aksi Wallet\n3. Klik set ID Mitra & Kampanye\n4. Ketik g0olqxh5h3 dibagian ID Mitra & Kampanye\n5. Klik Tambah\n6. Lalu klik tetapkan Ulang.\n\nIkutin Sesuai Video Tutorial ya. Jangan Lupa SS ketika sudah berhasil.\n\n[VIDEO: pindah_ib]`;
++
+                 await sendSmartMessage(ctx, pindahIbMsg);
+                 userSteps[userId] = 4;
+               }
+ 
+-              // 6. GAGAL BACA SEMUA (GAMBAR BURAM/TIDAK RELEVAN)
++              // 6. GAGAL BACA SEMUA (Tidak ada ID dan Tidak ada Keyword)
+               else {
+                 await ctx.telegram.editMessageText(
+                   ctx.chat.id,
+@@ -864,7 +1214,6 @@ async function initTelegramBot() {
+             );
+             await ctx.reply(welcomeMsg);
+             await saveChatLog(userId, "bot", welcomeMsg);
+-            await logUserProgress(userId, userName, 1);
+             startTimeoutTimer(userId, userName);
+             return;
+           }
+@@ -919,7 +1268,6 @@ async function initTelegramBot() {
+               okMsg = `Siap kak ${userName}, ditunggu ketikan ANGKA ID trading yang barunya ya kalau udah beres depo!`;
+ 
+             if (okMsg) await ctx.reply(okMsg);
+-            await logUserProgress(userId, userName, currentStep);
+             startTimeoutTimer(userId, userName);
+             return;
+           }
+@@ -932,7 +1280,8 @@ async function initTelegramBot() {
+               .split(",")
+               .map((k) => k.trim())
+               .filter((k) => k);
+-            const regex = new RegExp(`\\b(${keywordsArr.join("|")})\\b`, "i");
++            const escapedKeywords = keywordsArr.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
++            const regex = new RegExp(`\\b(${escapedKeywords.join("|")})\\b`, "i");
+ 
+             if (regex.test(textMessage)) {
+               matched = true;
+@@ -946,7 +1295,6 @@ async function initTelegramBot() {
+           }
+ 
+           if (matched) {
+-            await logUserProgress(userId, userName, userSteps[userId]);
+             startTimeoutTimer(userId, userName);
+             return;
+           }
+@@ -963,23 +1311,36 @@ async function initTelegramBot() {
+               await saveChatLog(userId, "bot", loadingMsg);
+             }
+           }
+-          let savedStep = userSteps[userId] || 1;
+-          await logUserProgress(userId, userName, savedStep);
+           startTimeoutTimer(userId, userName);
+         } catch (err) {
+           console.error("[MESSAGE ERROR]", err.message);
++        } finally {
++          if (trackedUserId) {
++            await logUserProgress(trackedUserId, trackedUserName, userSteps[trackedUserId] || 1);
++          }
+         }
+       });
+       jalankanAntrian();
+     });
+ 
++    bot.on("new_chat_members", async (ctx) => {
++      const links = await getDynamicGroupLinks();
++      if (links.telegram?.group_id) ID_GRUP_VIP = String(links.telegram.group_id);
++      if (ctx.chat.id.toString() !== String(ID_GRUP_VIP)) return;
++      const groupName = links.telegram?.group_name || ctx.chat.title || "Grup Telegram";
++      for (const member of ctx.message.new_chat_members || []) {
++        if (!member.is_bot) await saveTelegramGroupMembership(ctx.chat.id, groupName, member, "active");
++      }
++    });
++
+     bot.on("left_chat_member", async (ctx) => {
+-      if (ctx.chat.id.toString() === ID_GRUP_VIP) {
+-        try {
+-          await axios.get(
+-            `http://103.89.4.144/bot_wa/client/apiUpdateStatusMemberGrup/${ctx.message.left_chat_member.id}/keluar_sendiri`,
+-          );
+-        } catch (e) {}
++      const links = await getDynamicGroupLinks();
++      if (links.telegram?.group_id) ID_GRUP_VIP = String(links.telegram.group_id);
++      if (ctx.chat.id.toString() !== String(ID_GRUP_VIP)) return;
++      const member = ctx.message.left_chat_member;
++      if (!member?.is_bot) {
++        const groupName = links.telegram?.group_name || ctx.chat.title || "Grup Telegram";
++        await saveTelegramGroupMembership(ctx.chat.id, groupName, member, "left");
+       }
+     });
+ 
+@@ -992,170 +1353,7 @@ async function initTelegramBot() {
+   }
+ }
+ 
+-async function runDailyReport(options = {}) {
+-  const skipSync = options.skipSync === true;
+-  console.log("\n[CRON JOB] Memulai sync HFM sebelum laporan harian...");
+-
+-  // Pastikan sistem bot Telegram sudah terinisialisasi
+-  if (!bot) {
+-    console.log("[REPORT FAIL] Bot Telegram belum siap/terkoneksi.");
+-    return;
+-  }
+-
+-  let syncWarning = "";
+-  if (skipSync) {
+-    console.log(
+-      "[MANUAL REPORT] Sync dilewati; mengambil data laporan langsung dari database.",
+-    );
+-  } else {
+-    try {
+-      const syncResponse = await axios.get(
+-        "http://103.89.4.144/bot_wa/update-last-trade",
+-        { timeout: 180000 },
+-      );
+-      const syncResult = syncResponse.data || {};
+-      const syncFailed = Number(syncResult.failed || 0);
+-      if (syncResult.status !== "sukses" || syncFailed > 0) {
+-        syncWarning = `Sync HFM belum sempurna (failed=${syncFailed}).`;
+-        console.error("[SYNC WARNING] Tetap mengambil laporan:", syncResult);
+-      } else {
+-        console.log(
+-          "[SYNC HFM OK] Semua data berhasil disinkronkan. Menarik laporan...",
+-        );
+-      }
+-    } catch (syncError) {
+-      syncWarning = `Sync HFM gagal: ${syncError.message}`;
+-      console.error(
+-        "[SYNC WARNING] Sync gagal, laporan tetap dijalankan:",
+-        syncError.message,
+-      );
+-    }
+-  }
+-
+-  try {
+-    const urlLaporan = "http://103.89.4.144/bot_wa/client/apiLaporanHarian";
+-    const response = await axios.get(urlLaporan, { timeout: 60000 });
+-    const dataReport = response.data || {};
+-
+-    if (dataReport.status === "ok") {
+-      const masuk = dataReport.data.masuk || 0;
+-      const keluar_sendiri = dataReport.data.keluar_sendiri || 0;
+-      const lepas_ib = dataReport.data.lepas_ib || 0;
+-      const total_aktif = dataReport.data.total_aktif || 0;
+-
+-      const pesanReport = `📊 *LAPORAN HARIAN GRUP VIP BOSSCUAN* 📊\n\nHalo Admin! Berikut rekap aktivitas member hari ini berdasarkan database:\n\n👥 *Total Client/User Aktif:* ${total_aktif} orang\n📈 *Member Masuk:* ${masuk} orang\n🚪 *Keluar Sendiri:* ${keluar_sendiri} orang\n🚫 *Lepas IB / Kick:* ${lepas_ib} orang\n\n_Data ditarik otomatis dari database sistem._`;
+-
+-      const adminId = botSettings.globals.ID_ADMIN;
+-
+-      // 1. KIRIM KE ADMIN
+-      if (adminId) {
+-        await bot.telegram
+-          .sendMessage(adminId, pesanReport, { parse_mode: "Markdown" })
+-          .catch((err) =>
+-            console.error("[REPORT ERROR] Gagal kirim ke Admin:", err.message),
+-          );
+-      }
+-
+-      // 2. KIRIM KE GRUP (JIKA ADA)
+-      try {
+-        const ID_GRUP_LAPORAN = "-5564212131";
+-        if (ID_GRUP_LAPORAN) {
+-          await bot.telegram.sendMessage(ID_GRUP_LAPORAN, pesanReport, {
+-            parse_mode: "Markdown",
+-          });
+-          console.log("[REPORT SUKSES] Laporan harian berhasil dikirim.");
+-          return { sent: true };
+-        }
+-      } catch (groupErr) {
+-        console.error(
+-          "[REPORT ERROR] Gagal mengirim ke Grup:",
+-          groupErr.message,
+-        );
+-      }
+-    } else {
+-      console.error(
+-        "[REPORT FAIL] API mengembalikan status gagal/kosong. Data:",
+-        dataReport,
+-      );
+-      return { sent: false };
+-    }
+-  } catch (error) {
+-    console.error(
+-      "[REPORT ERROR] Gagal menarik data laporan dari CI4 setelah sync:",
+-      error.message,
+-    );
+-    return { sent: false };
+-  }
+-}
+-
+-// Reminder aktivitas terpisah dari laporan harian dan waktunya diatur dari dashboard.
+-async function runActivityReminder() {
+-  console.log("[ACTIVITY REMINDER] Mulai proses evaluasi client...");
+-  try {
+-    const response = await axios.post(
+-      "http://103.89.4.144/bot_wa/client/run-activity-reminders",
+-      {},
+-      { timeout: 120000 },
+-    );
+-    console.log("[ACTIVITY REMINDER] Proses selesai:", response.data);
+-  } catch (error) {
+-    console.error(
+-      "[ACTIVITY REMINDER ERROR] Gagal menjalankan evaluasi:",
+-      error.response?.data || error.message,
+-    );
+-  }
+-}
+-
+-const configuredCronTasks = new Map();
+-let scheduleCache = [];
+-
+-async function refreshConfiguredSchedules() {
+-  try {
+-    const response = await axios.get(
+-      "http://103.89.4.144/bot_wa/client/bot-schedules",
+-      { timeout: 15000 },
+-    );
+-    const schedules = response.data?.schedules || [];
+-    for (const [key, task] of configuredCronTasks) {
+-      if (!schedules.some((item) => item.schedule_key === key)) {
+-        task.stop();
+-        configuredCronTasks.delete(key);
+-      }
+-    }
+-    for (const schedule of schedules) {
+-      const [hour, minute] = String(schedule.run_at || "")
+-        .split(":")
+-        .map(Number);
+-      if (!Number.isInteger(hour) || !Number.isInteger(minute)) continue;
+-      const expression = String(minute) + " " + String(hour) + " * * *";
+-      const existing = configuredCronTasks.get(schedule.schedule_key);
+-      if (existing?.expression === expression) continue;
+-      if (existing) existing.task.stop();
+-      const handler =
+-        schedule.schedule_type === "report"
+-          ? runDailyReport
+-          : runActivityReminder;
+-      const task = cron.schedule(expression, handler, {
+-        scheduled: true,
+-        timezone: "Asia/Jakarta",
+-      });
+-      configuredCronTasks.set(schedule.schedule_key, { expression, task });
+-    }
+-    scheduleCache = schedules;
+-    console.log(
+-      "[SCHEDULE] Jadwal aktif:",
+-      schedules.map((item) => item.schedule_key + "=" + item.run_at).join(", "),
+-    );
+-  } catch (error) {
+-    console.error(
+-      "[SCHEDULE ERROR] Gagal membaca jadwal dashboard:",
+-      error.message,
+-    );
+-  }
+-}
+ setInterval(fetchConfig, 5 * 60 * 1000);
+-setInterval(refreshConfiguredSchedules, 60 * 1000);
+-refreshConfiguredSchedules();
+ initTelegramBot();
+ process.once("SIGINT", () => bot && bot.stop("SIGINT"));
+ process.once("SIGTERM", () => bot && bot.stop("SIGTERM"));
