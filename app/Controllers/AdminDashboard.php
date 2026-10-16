@@ -154,7 +154,18 @@ class AdminDashboard extends BaseController
             ? "COALESCE(NULLIF(NULLIF(tb_member_logs.id_telegram, ''), '-'), NULLIF(NULLIF(tb_member_vip.id_telegram, ''), '-'))"
             : 'tb_member_vip.id_telegram';
         $statusFromLog = "CASE WHEN tb_member_logs.tipe_aktivitas IN ('lepas_ib', 'kick_massal_lepas_ib') THEN 'lepas_ib' ELSE NULL END";
-        $builder->select("tb_member_logs.*, COALESCE(tb_member_vip.status, {$statusFromLog}) as status_member, {$logTelegramSelect} as id_telegram");
+        $joinActivityTypes = "'masuk', 'masuk_id_baru', 'masuk_via_form', 'aktif_kembali'";
+        $joinedAtSelect = "(SELECT MAX(previous_log.created_at) FROM tb_member_logs AS previous_log
+            WHERE previous_log.id_hfm = tb_member_logs.id_hfm
+              AND previous_log.tipe_aktivitas IN ({$joinActivityTypes})
+              AND (previous_log.created_at < tb_member_logs.created_at
+                   OR (previous_log.created_at = tb_member_logs.created_at AND previous_log.id < tb_member_logs.id)))";
+        $leftAtSelect = "CASE WHEN tb_member_logs.tipe_aktivitas IN ('lepas_ib', 'kick_massal_lepas_ib')
+            THEN tb_member_logs.created_at ELSE NULL END";
+        $builder->select("tb_member_logs.*, COALESCE(tb_member_vip.status, {$statusFromLog}) as status_member,
+            {$logTelegramSelect} as id_telegram,
+            {$joinedAtSelect} as waktu_bergabung,
+            {$leftAtSelect} as waktu_lepas_ib");
 
         // Setiap baris log adalah satu kejadian; join berdasarkan ID HFM agar
         // satu kejadian tidak berlipat saat satu nomor WA memiliki beberapa akun.

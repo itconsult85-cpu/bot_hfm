@@ -827,7 +827,7 @@ function replaceTags(msgText, userNameValue) {
 }
 
 // 5. INTEGRASI GEMINI AI
-async function askGemini(prompt, userName) {
+async function askGemini(prompt, userName, currentStep) {
   if (!genAI) return null;
   try {
     const modelName =
@@ -842,12 +842,17 @@ ATURAN MUTLAK:
 1. Jika user typo atau bertanya kendala, arahkan santai sesuai tahapnya.
 2. Gunakan bahasa gaul, panggil '${callingName}'. Maksimal 2 kalimat.`;
 
-    const result = await model.generateContent(
-      `${systemPrompt}\n\nUser: ${prompt}`,
-    );
+    const result = await Promise.race([
+      model.generateContent(`${systemPrompt}\n\nUser: ${prompt}`),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Gemini timeout")), 12000),
+      ),
+    ]);
     const response = await result.response;
-    return response.text().trim();
+    const text = response.text().trim();
+    return text || null;
   } catch (err) {
+    console.error("[GEMINI ERROR]", err.message);
     return null;
   }
 }
@@ -1516,6 +1521,11 @@ async function initTelegramBot() {
 
           // 5. MATCHING RULE, FAQ & FLOW
           let matched = false;
+          const matchingText =
+            userSteps[userId] === 1 &&
+            /^(minat|berminat|tertarik|mau gabung|mau ikut|ikut|yaa|iya|iyah|yap|yes)$/i.test(textLower)
+              ? `${textMessage} mau join`
+              : textMessage;
           for (const rule of [...botSettings.faqs, ...botSettings.flows]) {
             if (!rule.keywords && !rule.trigger_keywords) continue;
             const keywordsArr = (rule.keywords || rule.trigger_keywords)
@@ -1524,7 +1534,7 @@ async function initTelegramBot() {
               .filter((k) => k);
             const regex = new RegExp(`\\b(${keywordsArr.join("|")})\\b`, "i");
 
-            if (regex.test(textMessage)) {
+            if (regex.test(matchingText)) {
               matched = true;
               if (rule.step_level) userSteps[userId] = rule.step_level;
               await sendSmartMessage(
@@ -1548,9 +1558,9 @@ async function initTelegramBot() {
               await ctx.reply(aiReply);
               await saveChatLog(userId, "bot", aiReply);
             } else {
-              const loadingMsg = `Maaf kak ${userName}, sistemku lagi loading nih 🙏\n\nSilakan ketik /start untuk mengulang dari awal ya!`;
-              await ctx.reply(loadingMsg);
-              await saveChatLog(userId, "bot", loadingMsg);
+              const fallbackMsg = `Maaf kak ${userName}, aku belum memahami pesan itu.\n\nKetik /start untuk melihat panduan pendaftaran, atau ketik "tolong saya admin" jika ingin dibantu admin.`;
+              await ctx.reply(fallbackMsg, { reply_markup: adminHelpKeyboard() });
+              await saveChatLog(userId, "bot", fallbackMsg);
             }
           }
           let savedStep = userSteps[userId] || 1;

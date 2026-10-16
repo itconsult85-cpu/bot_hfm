@@ -148,14 +148,16 @@
                     <th class="border-bottom-0 d-none d-md-table-cell">ID Trading</th>
                     <th class="border-bottom-0 text-nowrap">Tipe Aktivitas</th>
                     <th class="border-bottom-0 d-none d-md-table-cell">Status</th>
-                    <th class="border-bottom-0 d-none d-md-table-cell">Waktu</th>
+                    <th class="border-bottom-0 d-none d-md-table-cell text-nowrap">Waktu Bergabung</th>
+                    <th class="border-bottom-0 d-none d-md-table-cell text-nowrap">Waktu Lepas IB</th>
+                    <th class="border-bottom-0 d-none d-md-table-cell text-nowrap">Waktu Aktivitas</th>
                     <th style="width: 100px;" class="text-center border-bottom-0 px-1 px-md-3">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($logs)): ?>
                     <tr>
-                        <td colspan="8" class="text-center py-5">
+                        <td colspan="10" class="text-center py-5">
                             <div class="empty-state">
                                 <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
                                 <h6 class="fw-bold mt-3">Tidak ada data</h6>
@@ -247,6 +249,26 @@
                                 <?php endif; ?>
                             </td>
                             <td class="text-nowrap d-none d-md-table-cell">
+                                <?php if (!empty($log['waktu_bergabung'])): ?>
+                                    <span class="text-success small" title="<?= esc($log['waktu_bergabung']) ?>">
+                                        <i class="bi bi-box-arrow-in-right me-1"></i><?= date('d M Y', strtotime($log['waktu_bergabung'])) ?><br>
+                                        <i class="bi bi-clock me-1"></i><?= date('H:i:s', strtotime($log['waktu_bergabung'])) ?> WIB
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted small">-</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-nowrap d-none d-md-table-cell">
+                                <?php if (!empty($log['waktu_lepas_ib'])): ?>
+                                    <span class="text-warning-emphasis small" title="<?= esc($log['waktu_lepas_ib']) ?>">
+                                        <i class="bi bi-box-arrow-right me-1"></i><?= date('d M Y', strtotime($log['waktu_lepas_ib'])) ?><br>
+                                        <i class="bi bi-clock me-1"></i><?= date('H:i:s', strtotime($log['waktu_lepas_ib'])) ?> WIB
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted small">-</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-nowrap d-none d-md-table-cell">
                                 <span class="text-muted small" title="<?= esc($log['created_at']) ?>">
                                     <i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($log['created_at'])) ?><br>
                                     <i class="bi bi-clock me-1"></i><?= date('H:i:s', strtotime($log['created_at'])) ?> WIB
@@ -256,7 +278,11 @@
                             <td class="text-nowrap text-center px-1 px-md-3">
                                 <div class="d-flex gap-1 justify-content-center">
                                     <button class="btn btn-sm btn-light border rounded-circle p-1 p-md-2" style="line-height: 1;" onclick="editIdLog('<?= esc($log['id_hfm'] ?? '') ?>')" title="Edit ID Trading"><i class="bi bi-pencil-square text-warning" style="font-size: 0.8rem;"></i></button>
-                                    <button class="btn btn-sm btn-light border rounded-circle p-1 p-md-2" style="line-height: 1;" onclick="showDetail('<?= esc($log['no_wa']) ?>', '<?= esc($log['id_telegram'] ?? '-') ?>', '<?= esc($log['nama']) ?>', '<?= esc($log['tipe_aktivitas']) ?>', '<?= esc($log['created_at']) ?>', '<?= esc($log['id_hfm'] ?? '-') ?>')"><i class="bi bi-eye text-primary" style="font-size: 0.8rem;"></i></button>
+                                    <button class="btn btn-sm btn-light border rounded-circle p-1 p-md-2" style="line-height: 1;"
+                                        data-wa="<?= esc($log['no_wa']) ?>" data-telegram="<?= esc($log['id_telegram'] ?? '-') ?>" data-nama="<?= esc($log['nama']) ?>"
+                                        data-tipe="<?= esc($log['tipe_aktivitas']) ?>" data-waktu="<?= esc($log['created_at']) ?>" data-id-trading="<?= esc($log['id_hfm'] ?? '-') ?>"
+                                        data-waktu-bergabung="<?= esc($log['waktu_bergabung'] ?? '') ?>" data-waktu-lepas-ib="<?= esc($log['waktu_lepas_ib'] ?? '') ?>"
+                                        onclick="showDetailFromButton(this)" title="Lihat detail"><i class="bi bi-eye text-primary" style="font-size: 0.8rem;"></i></button>
 
                                     <button type="button" class="btn btn-sm btn-light border rounded-circle btn-hapus-log p-1 p-md-2" style="line-height: 1;"
                                         data-id="<?= esc($log['id'] ?? '') ?>"
@@ -293,6 +319,22 @@
                                             <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Keluar Grup</span>
                                         <?php else: ?>
                                             <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">Tidak Terdaftar</span>
+                                        <?php endif; ?>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="fw-semibold d-block text-muted mb-1">Waktu Bergabung</span>
+                                        <?php if (!empty($log['waktu_bergabung'])): ?>
+                                            <i class="bi bi-box-arrow-in-right text-success me-1"></i><?= date('d M Y H:i:s', strtotime($log['waktu_bergabung'])) ?> WIB
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="fw-semibold d-block text-muted mb-1">Waktu Lepas IB</span>
+                                        <?php if (!empty($log['waktu_lepas_ib'])): ?>
+                                            <i class="bi bi-box-arrow-right text-warning me-1"></i><?= date('d M Y H:i:s', strtotime($log['waktu_lepas_ib'])) ?> WIB
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </li>
                                     <li>
@@ -345,6 +387,14 @@
                 <div class="mb-3">
                     <label class="text-muted small fw-semibold d-block mb-1">Tipe Aktivitas</label>
                     <p class="fw-semibold mb-0" id="detailTipe">-</p>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small fw-semibold d-block mb-1">Waktu Bergabung</label>
+                    <p class="fw-semibold mb-0" id="detailWaktuBergabung">-</p>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small fw-semibold d-block mb-1">Waktu Lepas IB</label>
+                    <p class="fw-semibold mb-0" id="detailWaktuLepasIb">-</p>
                 </div>
                 <div>
                     <label class="text-muted small fw-semibold d-block mb-1">Waktu</label>
@@ -480,11 +530,36 @@
         kickLepasIbForm?.requestSubmit();
     });
 
-    function showDetail(wa, telegram, nama, tipe, waktu, idTrading) {
+    function formatLogDate(value) {
+        if (!value) return '-';
+        const date = new Date(value.replace(' ', 'T'));
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleDateString('id-ID', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+    }
+
+    function showDetailFromButton(button) {
+        showDetail(
+            button.dataset.wa,
+            button.dataset.telegram,
+            button.dataset.nama,
+            button.dataset.tipe,
+            button.dataset.waktu,
+            button.dataset.idTrading,
+            button.dataset.waktuBergabung,
+            button.dataset.waktuLepasIb
+        );
+    }
+
+    function showDetail(wa, telegram, nama, tipe, waktu, idTrading, waktuBergabung, waktuLepasIb) {
         document.getElementById('detailWa').textContent = wa;
         document.getElementById('detailTelegram').textContent = telegram;
         document.getElementById('detailNama').textContent = nama;
         document.getElementById('detailIdTrading').textContent = idTrading;
+        document.getElementById('detailWaktuBergabung').textContent = formatLogDate(waktuBergabung);
+        document.getElementById('detailWaktuLepasIb').textContent = formatLogDate(waktuLepasIb);
 
         const tipeMap = {
             'masuk': 'Masuk',
@@ -494,17 +569,7 @@
         };
         document.getElementById('detailTipe').textContent = tipeMap[tipe] || tipe;
 
-        const date = new Date(waktu);
-        const options = {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        };
-        document.getElementById('detailWaktu').textContent = date.toLocaleDateString('id-ID', options);
+        document.getElementById('detailWaktu').textContent = formatLogDate(waktu);
 
         new bootstrap.Modal(document.getElementById('modalDetail')).show();
     }

@@ -300,10 +300,10 @@
 <div class="modal fade" id="modalQR" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content shadow-lg text-center p-4">
-            <h5 class="fw-bold mb-3">Koneksi WhatsApp</h5>
+            <h5 class="fw-bold mb-3">Koneksi Bot Telegram</h5>
             <div id="qrContainer" class="mb-3 d-none">
                 <canvas id="qrCanvas" class="img-fluid rounded shadow-sm border p-2"></canvas>
-                <p class="text-muted small mt-2">Scan QR code ini untuk menghubungkan bot WhatsApp.</p>
+                <p class="text-muted small mt-2">Pindai kode QR ini untuk menghubungkan bot.</p>
             </div>
             <div id="statusContainer" class="p-3 rounded bg-light mb-0">
                 <span id="botStatusBadge" class="badge bg-secondary p-2 px-3 rounded-pill">Mengecek status...</span>
@@ -765,7 +765,7 @@
                 } else {
                     qrContainer.classList.add('d-none');
                     botStatusBadge.className = "badge bg-danger p-2 px-3 rounded-pill";
-                    botStatusBadge.innerHTML = "<i class='bi bi-x-circle-fill me-1'></i> Terputus / Loading";
+                    botStatusBadge.innerHTML = "<i class='bi bi-x-circle-fill me-1'></i> Bot terputus / belum siap";
                 }
             }).catch(() => {
                 qrContainer.classList.add('d-none');
