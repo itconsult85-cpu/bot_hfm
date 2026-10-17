@@ -40,6 +40,53 @@ class Client extends BaseController
         return $this->response->setJSON(['status' => 'success', 'dikirim' => $berhasil]);
     }
 
+    /**
+     * Metadata tambahan untuk pemeriksaan yang dilakukan admin.
+     * Tidak dipakai oleh jalur user biasa dan tidak mengubah data member.
+     */
+    private function sensorNomorWa(?string $nomor): string
+    {
+        $nomor = trim((string) $nomor);
+        if ($nomor === '') {
+            return '-';
+        }
+
+        return substr($nomor, 0, 4) . 'xxxx' . substr($nomor, -4);
+    }
+
+    private function adminTradingInfo(array $member): array
+    {
+        $info = [
+            'registered' => true,
+            'member_status' => trim((string) ($member['status'] ?? '')) ?: null,
+            'id_telegram' => trim((string) ($member['id_telegram'] ?? '')) ?: null,
+            'group_status' => null,
+            'group_joined_at' => null,
+            'group_left_at' => null,
+        ];
+
+        if (!$info['id_telegram']) {
+            return $info;
+        }
+
+        try {
+            $groupMember = \Config\Database::connect()->table('telegram_group_members')
+                ->where('telegram_id', $info['id_telegram'])
+                ->orderBy('updated_at', 'DESC')
+                ->get(1)->getRowArray();
+            if ($groupMember) {
+                $info['group_status'] = $groupMember['status'] ?? null;
+                $info['group_joined_at'] = $groupMember['joined_at'] ?? null;
+                $info['group_left_at'] = $groupMember['left_at'] ?? null;
+            }
+        } catch (\Throwable $e) {
+            // Tabel pencatatan grup bersifat tambahan; kegagalannya tidak
+            // boleh membuat endpoint cek ID Trading gagal.
+        }
+
+        return $info;
+    }
+
     public function apiGroupLinks()
     {
         if (!$this->hasValidBotControlToken()) {
@@ -377,6 +424,13 @@ class Client extends BaseController
 
         if ($cek_db) {
             $db_wa = $cek_db['no_wa'];
+            if ($no_wa === 'ADMIN_CHECK') {
+                return $this->response->setJSON([
+                    'status' => 'id_diklaim_orang_lain',
+                    'no_tersensor' => $this->sensorNomorWa($db_wa),
+                    'admin_info' => $this->adminTradingInfo($cek_db),
+                ]);
+            }
             if ($db_wa == $no_wa) {
                 $campaignColumnExists = array_key_exists('campaign', $cek_db);
                 if (empty($cek_db['email']) || ($campaignColumnExists && empty($cek_db['campaign']))) {
@@ -478,7 +532,20 @@ class Client extends BaseController
 
         if ($lulus) {
             // 🛑 GATEKEEPER: JIKA DARI BOT TELEGRAM, HANYA CEK VALIDITAS (JANGAN SIMPAN)
-            if ($no_wa === "ADMIN_CHECK" || $no_wa === "CHECK_ONLY") {
+            if ($no_wa === "ADMIN_CHECK") {
+                return $this->response->setJSON([
+                    'status' => 'valid_sempurna',
+                    'admin_info' => [
+                        'registered' => false,
+                        'member_status' => null,
+                        'id_telegram' => null,
+                        'group_status' => null,
+                        'group_joined_at' => null,
+                        'group_left_at' => null,
+                    ],
+                ]);
+            }
+            if ($no_wa === "CHECK_ONLY") {
                 return $this->response->setJSON(['status' => 'valid_sempurna']);
             }
 

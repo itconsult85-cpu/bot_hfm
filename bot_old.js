@@ -362,6 +362,15 @@ function startTimeoutTimer(userId, userName) {
     clearTimeout(userTimeouts[userId].timeout);
   }
 
+  // Admin dapat melakukan pengecekan ID Trading berulang kali. Jangan pernah
+  // membuat follow-up otomatis untuk chat admin, tetapi tetap bersihkan timer
+  // lama agar timer yang sudah terlanjur dibuat tidak mengirim pesan.
+  const adminId = String(botSettings.globals.ID_ADMIN || "").trim();
+  if (adminId !== "" && String(userId) === adminId) {
+    delete userTimeouts[userId];
+    return;
+  }
+
   if (userSteps[userId] >= 7) {
     return;
   }

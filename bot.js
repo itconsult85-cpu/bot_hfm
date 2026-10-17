@@ -607,6 +607,51 @@ function adminHelpKeyboard() {
   };
 }
 
+function adminMemberStatusLabel(status) {
+  const labels = {
+    aktif: "Aktif",
+    lepas_ib: "Lepas IB",
+    keluar: "Keluar",
+    pasif: "Pasif",
+  };
+  return labels[String(status || "").trim()] || status || "Belum tercatat";
+}
+
+async function getAdminGroupStatus(adminInfo) {
+  const telegramId = String(adminInfo?.id_telegram || "").trim();
+  if (!telegramId) return "Belum ada ID Telegram / belum terdaftar ke bot";
+
+  const groupId = String(botSettings.globals.ID_GRUP_VIP || "").trim();
+  if (!groupId) return "ID grup belum dikonfigurasi";
+
+  try {
+    const member = await bot.telegram.getChatMember(groupId, telegramId);
+    if (["creator", "administrator", "member"].includes(member.status)) {
+      return `Sudah bergabung (${member.status === "member" ? "member" : member.status})`;
+    }
+    if (member.status === "restricted" && member.is_member === true) {
+      return "Sudah bergabung (restricted)";
+    }
+    if (member.status === "kicked") return "Dikeluarkan/diblokir dari grup";
+    if (member.status === "left") return "Belum bergabung atau sudah keluar";
+    return `Status Telegram: ${member.status}`;
+  } catch (error) {
+    return "Tidak dapat dicek langsung (user belum pernah terdeteksi di grup / bot tidak dapat mengakses)";
+  }
+}
+
+async function formatAdminMemberInfo(adminInfo) {
+  const dbStatus = adminMemberStatusLabel(adminInfo?.member_status);
+  const groupStatus = await getAdminGroupStatus(adminInfo);
+  const telegramId = String(adminInfo?.id_telegram || "").trim() || "-";
+  return (
+    "\n\n📌 *Detail member:*" +
+    `\n• Status database: *${dbStatus}*` +
+    `\n• ID Telegram: \`${telegramId}\`` +
+    `\n• Status grup: *${groupStatus}*`
+  );
+}
+
 function isAdminHelpKeyword(message) {
   const words =
     String(message || "")
@@ -916,6 +961,15 @@ function startTimeoutTimer(userId, userName) {
     clearTimeout(userTimeouts[userId].timeout);
   }
 
+  // Admin dapat melakukan pengecekan ID Trading berulang kali. Jangan pernah
+  // membuat follow-up otomatis untuk chat admin, tetapi tetap bersihkan timer
+  // lama agar timer yang sudah terlanjur dibuat tidak mengirim pesan.
+  const adminId = String(botSettings.globals.ID_ADMIN || "").trim();
+  if (adminId !== "" && String(userId) === adminId) {
+    delete userTimeouts[userId];
+    return;
+  }
+
   if (userSteps[userId] >= 7) {
     return;
   }
@@ -1209,7 +1263,10 @@ async function initTelegramBot() {
 
               if (resCek.data.status === "valid_sempurna") {
                 if (isAdmin) {
-                  finalMsg = `✅ *[ADMIN INFO]*\nID Trading \`${idTrading}\` statusnya *VALID* dan terdeteksi di IB BOSSCUAN!`;
+                  const adminInfo = resCek.data.admin_info || {};
+                  finalMsg =
+                    `✅ *[ADMIN INFO]*\nID Trading \`${idTrading}\` statusnya *VALID* dan terdeteksi di IB BOSSCUAN!` +
+                    await formatAdminMemberInfo(adminInfo);
                   await ctx.telegram.editMessageText(
                     ctx.chat.id,
                     sentLoadMsg.message_id,
@@ -1233,9 +1290,14 @@ async function initTelegramBot() {
                 startTimeoutTimer(userId, userName);
                 return;
               } else if (resCek.data.status === "id_diklaim_orang_lain") {
-                finalMsg = isAdmin
-                  ? `⚠️ *[ADMIN INFO]*\nID \`${idTrading}\` *SUDAH DIKLAIM* oleh nomor ${resCek.data.no_tersensor}.`
-                  : `❌ Maaf kak ${userName}, ID Trading ${idTrading} sudah diklaim oleh member lain dengan nomor ${resCek.data.no_tersensor}.`;
+                if (isAdmin) {
+                  const adminInfo = resCek.data.admin_info || {};
+                  finalMsg =
+                    `⚠️ *[ADMIN INFO]*\nID \`${idTrading}\` *SUDAH DIKLAIM* oleh nomor ${resCek.data.no_tersensor}.` +
+                    await formatAdminMemberInfo(adminInfo);
+                } else {
+                  finalMsg = `❌ Maaf kak ${userName}, ID Trading ${idTrading} sudah diklaim oleh member lain dengan nomor ${resCek.data.no_tersensor}.`;
+                }
               } else if (resCek.data.status === "kurang_deposit") {
                 finalMsg = isAdmin
                   ? `⚠️ *[ADMIN INFO]*\nID \`${idTrading}\` terdaftar, tapi *DEPOSIT KURANG*.\n_Pesan:_ ${resCek.data.pesan}`
