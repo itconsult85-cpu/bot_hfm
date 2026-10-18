@@ -1,6 +1,71 @@
 <?= $this->extend('layout/template') ?>
 <?= $this->section('content') ?>
 
+<style>
+    .bot-faq-table {
+        table-layout: fixed;
+        min-width: 760px;
+    }
+
+    .bot-faq-table .bot-faq-reply-cell,
+    .bot-faq-table .bot-faq-reply-cell > .bot-faq-reply {
+        text-align: left !important;
+    }
+
+    .bot-faq-table tbody > tr > .bot-faq-reply-cell {
+        text-align: left !important;
+        text-indent: 0 !important;
+    }
+
+    .bot-faq-table .bot-faq-reply-cell {
+        padding: .45rem .75rem .45rem 0 !important;
+        vertical-align: top;
+    }
+
+    .bot-faq-table .bot-faq-reply {
+        display: block !important;
+        width: 100%;
+        margin: 0 !important;
+        padding: .15rem 0;
+        color: #64748b;
+        font-size: .82rem;
+        line-height: 1.5;
+        white-space: pre-line !important;
+        text-align: left !important;
+        text-indent: 0 !important;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        max-height: 96px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .bot-faq-keywords {
+        display: block;
+        width: fit-content;
+        max-width: 100%;
+        padding: .4rem .55rem;
+        border: 1px solid #bfdbfe;
+        border-left: 3px solid #60a5fa;
+        border-radius: .35rem;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: .8rem;
+        font-weight: 600;
+        line-height: 1.35;
+        text-align: left;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 767.98px) {
+        .bot-faq-table {
+            min-width: 0;
+            table-layout: auto;
+        }
+    }
+</style>
+
 <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mt-2 mb-4">
 
     <div class="row align-items-md-center justify-content-between mb-3 g-3">
@@ -25,7 +90,14 @@
     <?php endif; ?>
 
     <div class="table-responsive border-0 overflow-hidden">
-        <table class="table table-hover align-middle table-sm mb-0">
+        <table class="table table-hover align-middle table-sm mb-0 bot-faq-table" style="text-align: left !important;">
+            <colgroup>
+                <col style="width: 7%;">
+                <col style="width: 25%;">
+                <col style="width: 40%;">
+                <col style="width: 15%;">
+                <col style="width: 13%;">
+            </colgroup>
             <thead class="table-light">
                 <tr>
                     <th class="text-center border-bottom-0 px-1 px-md-3" style="width: 45px;">No</th>
@@ -58,13 +130,13 @@
                             </td>
 
                             <td class="py-2 px-1 px-md-2">
-                                <span class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-semibold" style="white-space: normal; text-align: left; font-size: 0.8rem; line-height: 1.3;">
+                                <div class="bot-faq-keywords">
                                     <?= esc($faq['keywords']) ?>
-                                </span>
+                                </div>
                             </td>
 
-                            <td class="d-none d-md-table-cell">
-                                <div class="text-muted small pe-2" style="white-space: pre-wrap; max-height: 80px; overflow-y: auto;">
+                            <td class="d-none d-md-table-cell bot-faq-reply-cell" style="text-align: left !important; vertical-align: top !important;">
+                                <div class="bot-faq-reply" style="display: block !important; width: 100% !important; margin: 0 !important; padding: .15rem 0 0 0 !important; text-align: left !important;">
                                     <?= esc($faq['reply_message']) ?>
                                 </div>
                             </td>
@@ -102,7 +174,7 @@
                                     </li>
                                     <li>
                                         <span class="fw-semibold d-block text-muted mb-1">Reply Message:</span>
-                                        <div class="bg-white p-2 border rounded text-muted" style="white-space: pre-wrap; font-size: 0.75rem;">
+                                <div class="bg-white p-2 border rounded text-muted bot-faq-reply" style="text-align: left !important; white-space: pre-line; font-size: 0.75rem;">
                                             <?= esc($faq['reply_message']) ?>
                                         </div>
                                     </li>

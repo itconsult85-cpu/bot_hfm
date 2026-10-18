@@ -1,6 +1,31 @@
 <?= $this->extend('layout/template') ?>
 <?= $this->section('content') ?>
 
+<style>
+    .reminder-phase-message-cell,
+    .reminder-phase-message {
+        text-align: left !important;
+    }
+
+    .reminder-phase-message-cell {
+        vertical-align: top !important;
+    }
+
+    .reminder-phase-message {
+        display: block;
+        width: 100%;
+        max-height: 180px;
+        overflow: auto;
+        padding: .65rem .75rem !important;
+        color: #334155 !important;
+        font-size: .82rem !important;
+        line-height: 1.5;
+        white-space: pre-line !important;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+</style>
+
 <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mt-2">
 
     <div class="row align-items-md-center justify-content-between mb-3 g-3">
@@ -66,8 +91,8 @@
                             <?= $phase['is_active'] ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">Aktif</span>' : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2 py-1">Nonaktif</span>' ?>
                         </td>
 
-                        <td class="d-none d-md-table-cell">
-                            <div class="bg-light p-2 border rounded text-muted" style="white-space: pre-wrap; max-height: 70px; overflow-y: auto; font-size: 0.75rem;">
+                        <td class="d-none d-md-table-cell reminder-phase-message-cell">
+                            <div class="bg-light border rounded reminder-phase-message">
                                 <?= esc($phase['message']) ?>
                             </div>
                         </td>
@@ -101,7 +126,7 @@
                                 </li>
                                 <li>
                                     <span class="fw-semibold d-block text-muted mb-1">Isi Pesan Telegram</span>
-                                    <div class="bg-white p-2 border rounded" style="white-space: pre-wrap; font-size: 0.75rem;">
+                                    <div class="bg-white p-2 border rounded reminder-phase-message">
                                         <?= esc($phase['message']) ?>
                                     </div>
                                 </li>

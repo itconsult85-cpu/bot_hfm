@@ -113,8 +113,13 @@ app.post("/reset-user", async (req, res) => {
       delete userTimeouts[userId];
     }
 
-    console.log("[BOT API] State progres user " + userId + " berhasil di-reset.");
-    return res.json({ status: "success", message: "State progres bot berhasil di-reset." });
+    console.log(
+      "[BOT API] State progres user " + userId + " berhasil di-reset.",
+    );
+    return res.json({
+      status: "success",
+      message: "State progres bot berhasil di-reset.",
+    });
   } catch (error) {
     console.error("[BOT API ERROR] Gagal reset progres:", error.message);
     return res.status(500).json({ error: "Gagal mereset state bot." });
@@ -142,6 +147,7 @@ const db = mysql.createPool({
 // 3. MEMORI LOCAL & STATE GLOBAL
 let bot = null;
 let genAI = null;
+let geminiDisabled = false;
 let botStatus = { status: "Disconnected" };
 let botSettings = { globals: {}, flows: [], faqs: [] };
 
@@ -306,12 +312,10 @@ app.get("/api/capabilities", (req, res) => {
 
 app.post("/api/kick-lepas-ib-members", async (req, res) => {
   if (!(await fetchConfig())) {
-    return res
-      .status(503)
-      .json({
-        status: "failed",
-        error: "Konfigurasi bot tidak dapat dimuat dari database.",
-      });
+    return res.status(503).json({
+      status: "failed",
+      error: "Konfigurasi bot tidak dapat dimuat dari database.",
+    });
   }
   if (!hasValidControlToken(req)) {
     return res.status(401).json({ status: "failed", error: "Unauthorized." });
@@ -336,13 +340,11 @@ app.post("/api/kick-lepas-ib-members", async (req, res) => {
         ? " (fallback bot_globals)"
         : "");
     if (!groupId) {
-      return res
-        .status(409)
-        .json({
-          status: "failed",
-          error:
-            "ID grup tidak ditemukan. Atur group_id Telegram aktif di CI4 atau isi bot_globals.ID_GRUP_VIP pada database bot.",
-        });
+      return res.status(409).json({
+        status: "failed",
+        error:
+          "ID grup tidak ditemukan. Atur group_id Telegram aktif di CI4 atau isi bot_globals.ID_GRUP_VIP pada database bot.",
+      });
     }
     if (group?.source === "bot_globals.ID_GRUP_VIP") {
       console.warn(
@@ -744,14 +746,18 @@ function isConfusionOrHumanHelpRequest(message) {
 async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
   const adminId = String(botSettings.globals.ID_ADMIN || "").trim();
   if (!adminId) {
-    const message = "Maaf kak, admin belum dikonfigurasi di bot. Silakan hubungi pengelola grup secara langsung.";
+    const message =
+      "Maaf kak, admin belum dikonfigurasi di bot. Silakan hubungi pengelola grup secara langsung.";
     await ctx.reply(message);
     await saveChatLog(userId, "bot", message);
     return false;
   }
 
   const sender = ctx.from || {};
-  const fullName = [sender.first_name, sender.last_name].filter(Boolean).join(" ") || userName || "Kak";
+  const fullName =
+    [sender.first_name, sender.last_name].filter(Boolean).join(" ") ||
+    userName ||
+    "Kak";
   const username = sender.username ? "@" + sender.username : "-";
   const stageLabels = {
     1: "Status akun",
@@ -766,10 +772,18 @@ async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
   const photoFileIds = new Set();
   let latestUserNote = "";
   const isAdminHelpButtonText = (value) => {
-    const normalized = String(value || "").toLocaleLowerCase("id").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const normalized = String(value || "")
+      .toLocaleLowerCase("id")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
     const buttonPhrase = "tolong saya admin";
-    return normalized === buttonPhrase ||
-      normalized.replace(/^(?:[\p{L}\p{N}]{1,3}\s+)+(?=tolong saya admin$)/u, "") === buttonPhrase;
+    return (
+      normalized === buttonPhrase ||
+      normalized.replace(
+        /^(?:[\p{L}\p{N}]{1,3}\s+)+(?=tolong saya admin$)/u,
+        "",
+      ) === buttonPhrase
+    );
   };
   try {
     const [rows] = await db.query(
@@ -778,7 +792,9 @@ async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
     );
     for (const row of rows) {
       const storedMessage = String(row.message || "");
-      for (const match of storedMessage.matchAll(/\[TELEGRAM_FILE_ID:([^\]]+)\]/g)) {
+      for (const match of storedMessage.matchAll(
+        /\[TELEGRAM_FILE_ID:([^\]]+)\]/g,
+      )) {
         photoFileIds.add(match[1]);
       }
       if (!latestUserNote) {
@@ -795,10 +811,20 @@ async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
     console.error("[ADMIN HELP HISTORY ERROR]", error.message);
   }
 
-  const currentMessage = String(ctx.message?.text || ctx.message?.caption || "").trim();
-  if (currentMessage && !isAdminHelpButtonText(currentMessage)) latestUserNote = currentMessage;
-  const notePreview = [...(latestUserNote || "Tidak ada keterangan tambahan; silakan lihat foto terlampir bila tersedia.")].slice(0, 700).join("");
-  const reportTime = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
+  const currentMessage = String(
+    ctx.message?.text || ctx.message?.caption || "",
+  ).trim();
+  if (currentMessage && !isAdminHelpButtonText(currentMessage))
+    latestUserNote = currentMessage;
+  const notePreview = [
+    ...(latestUserNote ||
+      "Tidak ada keterangan tambahan; silakan lihat foto terlampir bila tersedia."),
+  ]
+    .slice(0, 700)
+    .join("");
+  const reportTime = new Date().toLocaleString("id-ID", {
+    timeZone: "Asia/Jakarta",
+  });
   const userProfileLink = "tg://user?id=" + encodeURIComponent(String(userId));
   const report = [
     "🆘 USER MEMINTA BANTUAN PENDAFTARAN",
@@ -815,12 +841,15 @@ async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
   try {
     await bot.telegram.sendMessage(adminId, report, {
       reply_markup: {
-        inline_keyboard: [[{ text: "📨 Buka chat user", url: userProfileLink }]],
+        inline_keyboard: [
+          [{ text: "📨 Buka chat user", url: userProfileLink }],
+        ],
       },
     });
   } catch (error) {
     console.error("[ADMIN HELP REPORT ERROR]", error.message);
-    const failure = "Maaf kak, informasi belum berhasil dikirim ke admin. Coba lagi beberapa saat.";
+    const failure =
+      "Maaf kak, informasi belum berhasil dikirim ke admin. Coba lagi beberapa saat.";
     await ctx.reply(failure);
     await saveChatLog(userId, "bot", failure);
     return false;
@@ -829,7 +858,15 @@ async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
   for (const [index, fileId] of [...photoFileIds].slice(0, 10).entries()) {
     try {
       await bot.telegram.sendPhoto(adminId, fileId, {
-        caption: "Foto user " + (index + 1) + " · " + fullName + " · ID Telegram " + userId + " · " + stageLabel,
+        caption:
+          "Foto user " +
+          (index + 1) +
+          " · " +
+          fullName +
+          " · ID Telegram " +
+          userId +
+          " · " +
+          stageLabel,
       });
     } catch (error) {
       console.error("[ADMIN HELP PHOTO ERROR]", error.message);
@@ -839,9 +876,14 @@ async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
   const pendingTimeout = userTimeouts[String(userId)]?.timeout;
   if (pendingTimeout) clearTimeout(pendingTimeout);
   delete userTimeouts[String(userId)];
-  const confirmation = "Info kendala kakak sudah dikirim satu kali ke admin. Admin akan menghubungi kakak langsung melalui Telegram. Pesan berikutnya tidak diteruskan melalui bot.";
+  const confirmation =
+    "Info kendala kakak sudah dikirim satu kali ke admin. Admin akan menghubungi kakak langsung melalui Telegram. Pesan berikutnya tidak diteruskan melalui bot.";
   await ctx.reply(confirmation);
-  await saveChatLog(userId, "bot", "Riwayat chat kakak sudah dikirim satu kali ke admin. Admin akan menghubungi kakak langsung melalui Telegram.");
+  await saveChatLog(
+    userId,
+    "bot",
+    "Riwayat chat kakak sudah dikirim satu kali ke admin. Admin akan menghubungi kakak langsung melalui Telegram.",
+  );
   return true;
 }
 
@@ -873,7 +915,7 @@ function replaceTags(msgText, userNameValue) {
 
 // 5. INTEGRASI GEMINI AI
 async function askGemini(prompt, userName, currentStep) {
-  if (!genAI) return null;
+  if (!genAI || geminiDisabled) return null;
   try {
     const modelName =
       botSettings.globals.GEMINI_MODEL || "gemini-2.5-flash-lite";
@@ -897,7 +939,14 @@ ATURAN MUTLAK:
     const text = response.text().trim();
     return text || null;
   } catch (err) {
-    console.error("[GEMINI ERROR]", err.message);
+    const errorMessage = String(err.message || err);
+    console.error("[GEMINI ERROR]", errorMessage);
+    if (/403|leaked|reported as leaked|API key/i.test(errorMessage)) {
+      geminiDisabled = true;
+      console.error(
+        "[GEMINI DISABLED] Gemini dinonaktifkan sementara. Flow dan FAQ tetap digunakan; ganti GEMINI_API_KEY untuk mengaktifkan kembali.",
+      );
+    }
     return null;
   }
 }
@@ -1060,9 +1109,13 @@ async function initTelegramBot() {
           const userKey = String(userId);
           if (!isAdmin) {
             try {
-              const statusUrl = "http://103.89.4.144/bot_wa/client/check_status_vip/" + userId;
+              const statusUrl =
+                "http://103.89.4.144/bot_wa/client/check_status_vip/" + userId;
               const controlToken = getBotControlToken();
-              if (!controlToken) throw new Error("BOT_CONTROL_TOKEN belum dikonfigurasi pada bot.");
+              if (!controlToken)
+                throw new Error(
+                  "BOT_CONTROL_TOKEN belum dikonfigurasi pada bot.",
+                );
               const checkStatus = await axios.get(statusUrl, {
                 timeout: 5000,
                 headers: { "X-Bot-Control-Token": controlToken },
@@ -1072,37 +1125,66 @@ async function initTelegramBot() {
                 validatedUsers.add(userKey);
                 let isMember = false;
                 try {
-                  const member = await bot.telegram.getChatMember(ID_GRUP_VIP, parseInt(userId, 10));
-                  isMember = ["creator", "administrator", "member"].includes(member.status);
+                  const member = await bot.telegram.getChatMember(
+                    ID_GRUP_VIP,
+                    parseInt(userId, 10),
+                  );
+                  isMember = ["creator", "administrator", "member"].includes(
+                    member.status,
+                  );
                 } catch (memberError) {
                   console.warn("[VIP MEMBERSHIP CHECK]", memberError.message);
                 }
 
                 userSteps[userId] = 7;
                 if (isMember) {
-                  const registeredMessage = "Kak, akun kakak sudah tervalidasi dan sudah terdaftar di Grup VIP. Bot ini hanya melayani pendaftaran.";
-                  await ctx.reply(registeredMessage, { reply_markup: { remove_keyboard: true } });
-                  await saveChatLog(userId, "bot", "User tervalidasi dan sudah terdaftar di Grup VIP.");
+                  const registeredMessage =
+                    "Kak, akun kakak sudah tervalidasi dan sudah terdaftar di Grup VIP. Bot ini hanya melayani pendaftaran.";
+                  await ctx.reply(registeredMessage, {
+                    reply_markup: { remove_keyboard: true },
+                  });
+                  await saveChatLog(
+                    userId,
+                    "bot",
+                    "User tervalidasi dan sudah terdaftar di Grup VIP.",
+                  );
                   return;
                 }
 
                 if (wasAlreadyValidated) {
-                  const invitedMessage = "Kak, akun kakak sudah tervalidasi dan undangan Grup VIP sudah diberikan. Bot ini hanya melayani pendaftaran.";
-                  await ctx.reply(invitedMessage, { reply_markup: { remove_keyboard: true } });
+                  const invitedMessage =
+                    "Kak, akun kakak sudah tervalidasi dan undangan Grup VIP sudah diberikan. Bot ini hanya melayani pendaftaran.";
+                  await ctx.reply(invitedMessage, {
+                    reply_markup: { remove_keyboard: true },
+                  });
                   await saveChatLog(userId, "bot", invitedMessage);
                   return;
                 }
 
-                const inviteLink = await bot.telegram.createChatInviteLink(ID_GRUP_VIP, {
-                  expire_date: Math.floor(Date.now() / 1000) + 60,
-                  member_limit: 1,
+                const inviteLink = await bot.telegram.createChatInviteLink(
+                  ID_GRUP_VIP,
+                  {
+                    expire_date: Math.floor(Date.now() / 1000) + 60,
+                    member_limit: 1,
+                  },
+                );
+                const inviteMessage =
+                  "Status akun kakak sudah tervalidasi. Silakan bergabung ke Grup VIP melalui tautan ini:\n" +
+                  inviteLink.invite_link;
+                const sentMsg = await ctx.reply(inviteMessage, {
+                  reply_markup: { remove_keyboard: true },
                 });
-                const inviteMessage = "Status akun kakak sudah tervalidasi. Silakan bergabung ke Grup VIP melalui tautan ini:\n" + inviteLink.invite_link;
-                const sentMsg = await ctx.reply(inviteMessage, { reply_markup: { remove_keyboard: true } });
-                await saveChatLog(userId, "bot", "Status tervalidasi; tautan undangan Grup VIP sudah dikirim.");
+                await saveChatLog(
+                  userId,
+                  "bot",
+                  "Status tervalidasi; tautan undangan Grup VIP sudah dikirim.",
+                );
                 setTimeout(async () => {
                   try {
-                    await bot.telegram.deleteMessage(userId, sentMsg.message_id);
+                    await bot.telegram.deleteMessage(
+                      userId,
+                      sentMsg.message_id,
+                    );
                   } catch (error) {}
                 }, 60000);
                 return;
@@ -1110,7 +1192,9 @@ async function initTelegramBot() {
               validatedUsers.delete(userKey);
             } catch (statusError) {
               if (statusError.response?.status === 401) {
-                console.error("[VIP STATUS CHECK ERROR] CI4 menolak BOT_CONTROL_TOKEN; samakan konfigurasi bot dan CI4.");
+                console.error(
+                  "[VIP STATUS CHECK ERROR] CI4 menolak BOT_CONTROL_TOKEN; samakan konfigurasi bot dan CI4.",
+                );
               } else {
                 console.error("[VIP STATUS CHECK ERROR]", statusError.message);
               }
@@ -1118,13 +1202,20 @@ async function initTelegramBot() {
                 "Maaf kak, status pendaftaran belum dapat diperiksa oleh sistem. Silakan coba lagi beberapa saat lagi atau hubungi admin secara langsung.",
                 { reply_markup: { remove_keyboard: true } },
               );
-              await saveChatLog(userId, "bot", "Pemeriksaan status VIP gagal; pendaftaran ditunda.");
+              await saveChatLog(
+                userId,
+                "bot",
+                "Pemeriksaan status VIP gagal; pendaftaran ditunda.",
+              );
               return;
             }
 
             if (validatedUsers.has(userKey)) {
-              const registeredMessage = "Kak, akun kakak sudah tervalidasi dan undangan Grup VIP sudah diberikan. Bot ini hanya melayani pendaftaran.";
-              await ctx.reply(registeredMessage, { reply_markup: { remove_keyboard: true } });
+              const registeredMessage =
+                "Kak, akun kakak sudah tervalidasi dan undangan Grup VIP sudah diberikan. Bot ini hanya melayani pendaftaran.";
+              await ctx.reply(registeredMessage, {
+                reply_markup: { remove_keyboard: true },
+              });
               return;
             }
           }
@@ -1135,12 +1226,13 @@ async function initTelegramBot() {
           }
 
           if (!isAdmin && isConfusionOrHumanHelpRequest(textMessage)) {
-            const helpChoice = "Saya coba bantu dulu ya, Kak. Jika masih terkendala dan ingin dibantu admin, tekan tombol di bawah atau ketik: tolong saya admin.";
+            const helpChoice =
+              "Saya coba bantu dulu ya, Kak. Jika masih terkendala dan ingin dibantu admin, tekan tombol di bawah atau ketik: tolong saya admin.";
             await ctx.reply(helpChoice, { reply_markup: adminHelpKeyboard() });
             await saveChatLog(userId, "bot", helpChoice);
           }
 
-// 1.5 PENANGANAN FORMULIR & ID TRADING (AUTO DETEKSI DARI STEP MANA PUN)
+          // 1.5 PENANGANAN FORMULIR & ID TRADING (AUTO DETEKSI DARI STEP MANA PUN)
           const namaMatch = textMessage.match(/Nama\s*:\s*(.+)/i);
           const waMatch = textMessage.match(
             /(?:No wa aktif|No wa|Nomor wa|WA)\s*:\s*(.+)/i,
@@ -1192,7 +1284,9 @@ async function initTelegramBot() {
 
                 const suksesMsg = `Selamat kak ${dataForm.nama}! Data berhasil diverifikasi.\n\nSilakan bergabung melalui link Grup VIP di bawah ini ya:\n👉 ${inviteLink.invite_link}\n\n_(Pesan otomatis ditarik dlm 1 menit)_`;
 
-                await bot.telegram.deleteMessage(ctx.chat.id, loadFormMsg.message_id).catch(() => {});
+                await bot.telegram
+                  .deleteMessage(ctx.chat.id, loadFormMsg.message_id)
+                  .catch(() => {});
                 const sentMsg = await ctx.reply(suksesMsg, {
                   reply_markup: { remove_keyboard: true },
                 });
@@ -1266,7 +1360,7 @@ async function initTelegramBot() {
                   const adminInfo = resCek.data.admin_info || {};
                   finalMsg =
                     `✅ *[ADMIN INFO]*\nID Trading \`${idTrading}\` statusnya *VALID* dan terdeteksi di IB BOSSCUAN!` +
-                    await formatAdminMemberInfo(adminInfo);
+                    (await formatAdminMemberInfo(adminInfo));
                   await ctx.telegram.editMessageText(
                     ctx.chat.id,
                     sentLoadMsg.message_id,
@@ -1294,7 +1388,7 @@ async function initTelegramBot() {
                   const adminInfo = resCek.data.admin_info || {};
                   finalMsg =
                     `⚠️ *[ADMIN INFO]*\nID \`${idTrading}\` *SUDAH DIKLAIM* oleh nomor ${resCek.data.no_tersensor}.` +
-                    await formatAdminMemberInfo(adminInfo);
+                    (await formatAdminMemberInfo(adminInfo));
                 } else {
                   finalMsg = `❌ Maaf kak ${userName}, ID Trading ${idTrading} sudah diklaim oleh member lain dengan nomor ${resCek.data.no_tersensor}.`;
                 }
@@ -1585,18 +1679,30 @@ async function initTelegramBot() {
           let matched = false;
           const matchingText =
             userSteps[userId] === 1 &&
-            /^(minat|berminat|tertarik|mau gabung|mau ikut|ikut|yaa|iya|iyah|yap|yes)$/i.test(textLower)
+            /^(minat|berminat|tertarik|mau gabung|mau ikut|ikut|yaa|iya|iyah|yap|yes)$/i.test(
+              textLower,
+            )
               ? `${textMessage} mau join`
               : textMessage;
+          const expandedMatchingText = matchingText
+            .replace(/\bwd\b/gi, "wd withdraw penarikan tarik cair")
+            .replace(/\bdepo\b/gi, "depo deposit")
+            .replace(/\bmt5\b/gi, "mt5 metatrader");
           for (const rule of [...botSettings.faqs, ...botSettings.flows]) {
             if (!rule.keywords && !rule.trigger_keywords) continue;
             const keywordsArr = (rule.keywords || rule.trigger_keywords)
               .split(",")
               .map((k) => k.trim())
               .filter((k) => k);
-            const regex = new RegExp(`\\b(${keywordsArr.join("|")})\\b`, "i");
+            const escapedKeywords = keywordsArr.map((keyword) =>
+              keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            );
+            const regex = new RegExp(
+              `(?:^|\\s)(${escapedKeywords.join("|")})(?:$|\\s|[!?.,])`,
+              "i",
+            );
 
-            if (regex.test(matchingText)) {
+            if (regex.test(expandedMatchingText)) {
               matched = true;
               if (rule.step_level) userSteps[userId] = rule.step_level;
               await sendSmartMessage(
@@ -1621,7 +1727,9 @@ async function initTelegramBot() {
               await saveChatLog(userId, "bot", aiReply);
             } else {
               const fallbackMsg = `Maaf kak ${userName}, aku belum memahami pesan itu.\n\nKetik /start untuk melihat panduan pendaftaran, atau ketik "tolong saya admin" jika ingin dibantu admin.`;
-              await ctx.reply(fallbackMsg, { reply_markup: adminHelpKeyboard() });
+              await ctx.reply(fallbackMsg, {
+                reply_markup: adminHelpKeyboard(),
+              });
               await saveChatLog(userId, "bot", fallbackMsg);
             }
           }

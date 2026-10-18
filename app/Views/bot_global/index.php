@@ -1,6 +1,69 @@
 <?= $this->extend('layout/template') ?>
 <?= $this->section('content') ?>
 
+<style>
+    .bot-global-table {
+        table-layout: fixed;
+        min-width: 720px;
+    }
+
+    .bot-global-table th,
+    .bot-global-table td {
+        vertical-align: middle;
+    }
+
+    .bot-global-table .bot-global-value-cell {
+        text-align: left !important;
+        padding: .45rem .75rem .45rem 0 !important;
+    }
+
+    .bot-global-table .bot-global-value {
+        display: block;
+        width: 100%;
+        margin: 0 !important;
+        padding: .15rem 0;
+        color: #64748b;
+        font-size: .82rem;
+        line-height: 1.5;
+        text-align: left !important;
+        text-indent: 0 !important;
+        margin-left: 0 !important;
+        margin-right: auto !important;
+        display: flex !important;
+        flex-direction: column;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        max-height: 96px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .bot-global-table .bot-global-value::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .bot-global-table .bot-global-value::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+    }
+
+    .bot-global-table .bot-global-value.is-sensitive,
+    .bot-global-table .bot-global-value.is-url {
+        font-family: var(--bs-font-monospace, SFMono-Regular, Consolas, monospace);
+        font-size: .78rem;
+    }
+
+    @media (max-width: 767.98px) {
+        .bot-global-table {
+            min-width: 0;
+            table-layout: auto;
+        }
+    }
+</style>
+
 <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mt-2 mb-4">
 
     <div class="row align-items-md-center justify-content-between mb-3 g-3">
@@ -25,7 +88,13 @@
     <?php endif; ?>
 
     <div class="table-responsive border-0 overflow-hidden">
-        <table class="table table-hover align-middle table-sm mb-0">
+        <table class="table table-hover align-middle table-sm mb-0 bot-global-table">
+            <colgroup>
+                <col style="width: 7%;">
+                <col style="width: 25%;">
+                <col style="width: 58%;">
+                <col style="width: 10%;">
+            </colgroup>
             <thead class="table-light">
                 <tr>
                     <th class="text-center border-bottom-0 px-1 px-md-3" style="width: 45px;">No</th>
@@ -62,9 +131,14 @@
                                 </span>
                             </td>
 
-                            <td class="d-none d-md-table-cell">
-                                <div class="text-muted small pe-3" style="white-space: pre-wrap; max-height: 80px; overflow-y: auto;">
-                                    <?= esc($g['key_value']) ?>
+                            <?php
+                            $value = (string) ($g['key_value'] ?? '');
+                            $isSensitive = in_array(strtoupper((string) $g['key_name']), ['TELEGRAM_TOKEN', 'GEMINI_API_KEY', 'BOT_CONTROL_TOKEN'], true);
+                            $isUrl = filter_var($value, FILTER_VALIDATE_URL) !== false;
+                            ?>
+                            <td class="d-none d-md-table-cell bot-global-value-cell">
+                                <div class="bot-global-value<?= $isSensitive ? ' is-sensitive' : '' ?><?= $isUrl ? ' is-url' : '' ?>" style="text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important;">
+                                    <span style="display: block; width: 100%; text-align: left !important; margin: 0; padding: 0; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;"><?= esc($g['key_value']) ?></span>
                                 </div>
                             </td>
 
