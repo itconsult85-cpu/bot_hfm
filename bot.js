@@ -1547,7 +1547,7 @@ async function initTelegramBot() {
                     loadMsg.message_id,
                   );
                 } catch (e) {}
-                const successMsg = `Mantap kak ${userName}, bukti pindah IB berhasil terdeteksi!\n\nSelanjutnya : \n\n1. arsipkan akun trading lamanya\n2. lalu buka akun trading baru ( bebas ) Pastikan Masukin kode IB g0olqxh5h3 di bagian introducing broker\n3. Lalu deposit minimal $10`;
+                const successMsg = `Mantap kak ${userName}, bukti pindah IB berhasil terdeteksi!\n\nSelanjutnya : \n\n1. arsipkan akun trading lamanya\n2. lalu buka akun trading baru ( bebas ) Pastikan Masukin kode IB g0olqxh5h3 di bagian introducing broker\n3. Lalu deposit minimal setara Rp100.000 (nilai USD/USC akan menyesuaikan kurs saat validasi)`;
                 await sendSmartMessage(ctx, successMsg);
                 userSteps[userId] = 5;
               }
@@ -1564,7 +1564,7 @@ async function initTelegramBot() {
                     loadMsg.message_id,
                   );
                 } catch (e) {}
-                const arsipMsg = `Mantap kak ${userName}, udah berhasil arsip akun!\n\nSekarang lanjut ke langkah berikutnya:\n1. Buka akun trading Live MT5 (bebas pilih tipe)\n2. Pastikan memasukkan Kode IB g0olqxh5h3\n3. Deposit minimal Rp100.000\n\n⚠️ Kalo udah deposit, Ketik Angka Akun ID trading barunya ke sini ya kak!\n\n[GAMBAR: ss_akunsayaapk]\n\n[GAMBAR: ss_akunsaya]`;
+                const arsipMsg = `Mantap kak ${userName}, udah berhasil arsip akun!\n\nSekarang lanjut ke langkah berikutnya:\n1. Buka akun trading Live MT5 (bebas pilih tipe)\n2. Pastikan memasukkan Kode IB g0olqxh5h3\n3. Deposit minimal setara Rp100.000 (ambang USD/USC menyesuaikan kurs saat validasi)\n\n⚠️ Kalo udah deposit, Ketik Angka Akun ID trading barunya ke sini ya kak!\n\n[GAMBAR: ss_akunsayaapk]\n\n[GAMBAR: ss_akunsaya]`;
                 await sendSmartMessage(ctx, arsipMsg);
                 userSteps[userId] = 6;
               }

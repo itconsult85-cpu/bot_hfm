@@ -87,6 +87,51 @@ class Client extends BaseController
         return $info;
     }
 
+    /**
+     * Converts the Rp100,000 registration threshold to the account currency.
+     * HFM reports cent accounts as USC: 100 USC equals 1 USD.
+     *
+     * @return array{available: bool, amount: float, display: string, rate?: float, rate_date?: string}
+     */
+    private function minimumDepositRequirement(string $currency): array
+    {
+        $currency = strtoupper(trim($currency));
+        if ($currency === 'IDR') {
+            return ['available' => true, 'amount' => 100000.0, 'display' => 'Rp100.000'];
+        }
+
+        if (in_array($currency, ['USD', 'USC'], true)) {
+            $rateInfo = (new \App\Libraries\ExchangeRateService())->getUsdIdrRate();
+            if ($rateInfo === null) {
+                return ['available' => false, 'amount' => 0.0, 'display' => ''];
+            }
+
+            $usdMinimum = 100000 / (float) $rateInfo['rate'];
+            if ($currency === 'USC') {
+                $amount = (float) ceil($usdMinimum * 100);
+                $display = number_format($amount, 0, ',', '.') . ' USC (sekitar $'
+                    . number_format($amount / 100, 2, ',', '.') . ' USD)';
+            } else {
+                $amount = ceil($usdMinimum * 100) / 100;
+                $display = '$' . number_format($amount, 2, ',', '.') . ' USD';
+            }
+
+            $display .= ', kurs acuan USD/IDR ' . number_format((float) $rateInfo['rate'], 0, ',', '.')
+                . ' per 1 USD, tanggal ' . $rateInfo['date'];
+
+            return [
+                'available' => true,
+                'amount' => $amount,
+                'display' => $display,
+                'rate' => (float) $rateInfo['rate'],
+                'rate_date' => (string) $rateInfo['date'],
+            ];
+        }
+
+        // Keep the pre-existing native-currency rule for other account currencies.
+        return ['available' => true, 'amount' => 10.0, 'display' => '10 ' . $currency];
+    }
+
     public function apiGroupLinks()
     {
         if (!$this->hasValidBotControlToken()) {
@@ -516,19 +561,15 @@ class Client extends BaseController
             $last_trade = date('Y-m-d H:i:s', strtotime($raw_last_trade));
         }
 
-        $lulus = false;
-        $min = "";
-
-        if ($currency === 'IDR') {
-            if ($deposit >= 100000) $lulus = true;
-            $min = "Rp 100.000";
-        } elseif ($currency === 'USC') {
-            if ($deposit >= 550) $lulus = true;
-            $min = "550 USC";
-        } else {
-            if ($deposit >= 10) $lulus = true;
-            $min = "$10";
+        $requirement = $this->minimumDepositRequirement((string) $currency);
+        if (!$requirement['available']) {
+            return $this->response->setStatusCode(503)->setJSON([
+                'status' => 'error',
+                'pesan' => 'Kurs USD/IDR sedang tidak tersedia. Validasi deposit ditunda, silakan coba kembali beberapa saat lagi.',
+            ]);
         }
+        $lulus = $deposit + 0.0000001 >= $requirement['amount'];
+        $min = $requirement['display'];
 
         if ($lulus) {
             // 🛑 GATEKEEPER: JIKA DARI BOT TELEGRAM, HANYA CEK VALIDITAS (JANGAN SIMPAN)
@@ -598,7 +639,7 @@ class Client extends BaseController
         } else {
             return $this->response->setJSON([
                 'status' => 'kurang_deposit',
-                'pesan'  => "Saldo/Deposit Kakak saat ini $deposit $currency.\nUntuk bisa bergabung di Grup VIP silakan isi saldo minimal {$min}."
+                'pesan'  => "Saldo/Deposit Kakak saat ini $deposit $currency.\nUntuk bisa bergabung di Grup VIP silakan isi saldo minimal {$min} (setara Rp100.000)."
             ]);
         }
     }
@@ -645,16 +686,16 @@ class Client extends BaseController
         $response = curl_exec($ch);
         curl_close($ch);
 
-        // Siapkan nilai default jika API tiba-tiba gangguan
+        // API HFM wajib berhasil agar pendaftaran tidak dapat melewati validasi minimum.
         $deposit_real = 0;
         $currency_real = 'USD';
         $last_trade_real = '0000-00-00 00:00:00';
         $nama_real = $nama_form;
+        $dataApi = [];
 
         // 3. PROSES JSON DARI HFM
         if ($response) {
             $rawData = json_decode($response, true);
-            $dataApi = [];
             if (isset($rawData[0]) && is_array($rawData[0])) {
                 $dataApi = $rawData[0];
             } elseif (isset($rawData['data'][0]) && is_array($rawData['data'][0])) {
@@ -692,6 +733,27 @@ class Client extends BaseController
                     $last_trade_real = date('Y-m-d H:i:s', strtotime(substr($raw_last_trade, 0, 19)));
                 }
             }
+        }
+
+        if (empty($dataApi['id']) || (string) $dataApi['id'] !== (string) $id_hfm) {
+            return $this->response->setStatusCode(502)->setJSON([
+                'status' => 'error',
+                'pesan' => 'Data akun belum dapat diverifikasi dari API HFM. Silakan coba kembali.',
+            ]);
+        }
+
+        $requirement = $this->minimumDepositRequirement((string) $currency_real);
+        if (!$requirement['available']) {
+            return $this->response->setStatusCode(503)->setJSON([
+                'status' => 'error',
+                'pesan' => 'Kurs USD/IDR sedang tidak tersedia. Pendaftaran ditunda, silakan coba kembali beberapa saat lagi.',
+            ]);
+        }
+        if ($deposit_real + 0.0000001 < $requirement['amount']) {
+            return $this->response->setJSON([
+                'status' => 'kurang_deposit',
+                'pesan' => "Saldo/Deposit Kakak saat ini $deposit_real $currency_real. Minimum pendaftaran adalah {$requirement['display']} (setara Rp100.000).",
+            ]);
         }
 
         // 4. SIMPAN DATA KE DATABASE DENGAN DATA ASLI API
