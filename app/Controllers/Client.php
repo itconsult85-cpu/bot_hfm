@@ -156,6 +156,39 @@ class Client extends BaseController
         ]);
     }
 
+    /** Mengambil kurs terbaru untuk command admin Telegram /kurs tanpa mengubah database. */
+    public function apiKursTerbaru()
+    {
+        if (!$this->hasValidBotControlToken()) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ]);
+        }
+
+        $rateInfo = (new \App\Libraries\ExchangeRateService())->getUsdIdrRate();
+        if ($rateInfo === null) {
+            return $this->response->setStatusCode(503)->setJSON([
+                'status' => 'error',
+                'message' => 'Kurs USD/IDR sedang tidak tersedia.',
+            ]);
+        }
+
+        $rate = (float) $rateInfo['rate'];
+        $usdMinimum = ceil((100000 / $rate) * 100) / 100;
+        $uscMinimum = (int) ceil((100000 / $rate) * 100);
+
+        return $this->response->setJSON([
+            'status' => 'ok',
+            'rate' => $rate,
+            'rate_date' => (string) $rateInfo['date'],
+            'fetched_at' => (int) ($rateInfo['fetched_at'] ?? time()),
+            'minimum_idr' => 100000,
+            'minimum_usd' => $usdMinimum,
+            'minimum_usc' => $uscMinimum,
+        ]);
+    }
+
     public function apiWhatsAppGroupJoin()
     {
         if (!$this->hasValidBotControlToken()) {

@@ -22,7 +22,7 @@
         width: 100%;
         margin: 0 !important;
         padding: .15rem 0;
-        color: #64748b;
+        color: var(--bs-secondary-color);
         font-size: .82rem;
         line-height: 1.5;
         text-align: left !important;
@@ -46,7 +46,7 @@
     }
 
     .bot-global-table .bot-global-value::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
+        background: var(--bs-border-color);
         border-radius: 999px;
     }
 

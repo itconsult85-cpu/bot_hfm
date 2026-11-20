@@ -17,7 +17,7 @@
         max-height: 180px;
         overflow: auto;
         padding: .65rem .75rem !important;
-        color: #334155 !important;
+        color: var(--bs-body-color) !important;
         font-size: .82rem !important;
         line-height: 1.5;
         white-space: pre-line !important;

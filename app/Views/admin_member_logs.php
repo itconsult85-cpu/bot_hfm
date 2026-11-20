@@ -14,7 +14,7 @@
             <button id="kickLepasIbButton" type="submit" class="btn btn-danger rounded-pill px-3 fw-semibold"
                 <?= empty($kickTargetGroupId) || (int) ($lepasIbTelegramCount ?? 0) === 0 ? 'disabled' : '' ?>
                 title="Keluarkan anggota berstatus Lepas IB dari grup Telegram aktif">
-                <i class="bi bi-person-x-fill me-1"></i>Kick Lepas IB
+                <i class="bi bi-person-x-fill me-1"></i>Kick & Hapus Lepas IB
                 <span class="badge text-bg-light text-danger ms-1"><?= number_format((int) ($lepasIbTelegramCount ?? 0)) ?></span>
             </button>
         </form>
@@ -475,7 +475,7 @@
                     <li>Grup Telegram <strong id="kickConfirmationGroup">Grup Telegram VIP aktif</strong></li>
                 </ul>
                 <p class="text-muted small mb-0">
-                    Member yang sudah keluar serta admin atau pemilik grup akan dilewati. Status member di database tidak diubah.
+                    Member yang sudah keluar serta admin atau pemilik grup akan dilewati. Roster hanya dihapus untuk user yang berhasil dikick atau sudah dipastikan keluar; user yang gagal tetap tersimpan untuk dicoba lagi.
                 </p>
             </div>
             <div class="modal-footer border-0 pt-0 px-4 pb-4">

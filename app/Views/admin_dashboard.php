@@ -319,7 +319,7 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script src="<?= base_url('assets/vendor/qrcode/qrcode.min.js') ?>"></script>
 <script>
     document.querySelectorAll('.btn-hapus').forEach(btn => {
         btn.addEventListener('click', function(e) {

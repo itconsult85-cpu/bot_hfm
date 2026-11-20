@@ -45,6 +45,68 @@ class AdminDashboard extends BaseController
         ];
     }
 
+    private function resolveTelegramUsernamesFromChatLogs(array $telegramIds): array
+    {
+        $telegramIds = array_values(array_unique(array_filter(
+            array_map(static fn ($id): string => trim((string) $id), $telegramIds),
+            static fn (string $id): bool => preg_match('/^[1-9][0-9]*$/', $id) === 1
+        )));
+        if ($telegramIds === []) {
+            return [];
+        }
+
+        $db = \Config\Database::connect();
+        $tokenRow = $db->table('bot_globals')->select('key_value')
+            ->where('key_name', 'BOT_CONTROL_TOKEN')->orderBy('id', 'DESC')->get()->getRowArray();
+        $token = trim((string) ($tokenRow['key_value'] ?? ''));
+        if ($token === '') {
+            return [];
+        }
+
+        $host = trim((string) (getenv('BOT_API_HOST') ?: '127.0.0.1'));
+        $port = (int) (getenv('API_PORT') ?: 3000);
+        if ($port < 1 || $port > 65535) {
+            $port = 3000;
+        }
+        $url = sprintf('http://%s:%d/api/resolve-telegram-usernames', $host, $port);
+        $resolved = [];
+
+        foreach (array_chunk($telegramIds, 500) as $batch) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'X-Bot-Control-Token: ' . $token,
+                ],
+                CURLOPT_POSTFIELDS => json_encode(['telegram_ids' => $batch]),
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 180,
+            ]);
+            $raw = curl_exec($ch);
+            $error = curl_error($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($error || $httpCode < 200 || $httpCode >= 300) {
+                continue;
+            }
+            $response = json_decode($raw ?: '', true);
+            if (($response['status'] ?? '') !== 'success' || !is_array($response['usernames'] ?? null)) {
+                continue;
+            }
+            foreach ($response['usernames'] as $telegramId => $username) {
+                $username = ltrim(trim((string) $username), '@');
+                if (preg_match('/^[A-Za-z][A-Za-z0-9_]{4,31}$/', $username) === 1) {
+                    $resolved[(string) $telegramId] = $username;
+                }
+            }
+        }
+
+        return $resolved;
+    }
+
     // ==========================================
     // DASHBOARD UTAMA
     // ==========================================
@@ -322,7 +384,17 @@ class AdminDashboard extends BaseController
         $db = \Config\Database::connect();
         $hasLogTelegram = $this->hasMemberLogTelegramColumn($db);
         $telegramSelect = $hasLogTelegram ? 'kick.id_telegram' : 'NULL AS id_telegram';
-        $sql = "SELECT kick.nama, kick.no_wa, {$telegramSelect}, kick.id_hfm, kick.tipe_aktivitas, kick.created_at
+        $hasTelegramUsername = $hasLogTelegram
+            && $db->tableExists('telegram_group_members')
+            && $db->fieldExists('telegram_username', 'telegram_group_members');
+        $telegramUsernameSelect = $hasTelegramUsername
+            ? "(SELECT membership.telegram_username FROM telegram_group_members AS membership
+                WHERE membership.telegram_id = TRIM(kick.id_telegram)
+                  AND membership.telegram_username IS NOT NULL
+                  AND TRIM(membership.telegram_username) <> ''
+                ORDER BY membership.updated_at DESC LIMIT 1) AS telegram_username"
+            : 'NULL AS telegram_username';
+        $sql = "SELECT kick.nama, kick.no_wa, {$telegramSelect}, {$telegramUsernameSelect}, kick.id_hfm, kick.tipe_aktivitas, kick.created_at
             FROM tb_member_logs AS kick
             WHERE kick.tipe_aktivitas = ?
                OR (
@@ -355,19 +427,41 @@ class AdminDashboard extends BaseController
                 ->with('warning', 'Belum ada user Lepas IB yang tercatat dikick admin, baik manual maupun massal.');
         }
 
+        $idsMissingUsername = [];
+        foreach ($logs as $log) {
+            $telegramId = trim((string) ($log['id_telegram'] ?? ''));
+            $telegramUsername = ltrim(trim((string) ($log['telegram_username'] ?? '')), '@');
+            if (
+                preg_match('/^[1-9][0-9]*$/', $telegramId) === 1
+                && preg_match('/^[A-Za-z][A-Za-z0-9_]{4,31}$/', $telegramUsername) !== 1
+            ) {
+                $idsMissingUsername[$telegramId] = $telegramId;
+            }
+        }
+        $resolvedUsernames = $this->resolveTelegramUsernamesFromChatLogs(array_values($idsMissingUsername));
+
         $rows = [];
+        $hyperlinks = [];
         foreach ($logs as $index => $log) {
+            $telegramId = trim((string) ($log['id_telegram'] ?? ''));
+            $telegramUsername = ltrim(trim((string) ($log['telegram_username'] ?? '')), '@');
+            if (preg_match('/^[A-Za-z][A-Za-z0-9_]{4,31}$/', $telegramUsername) !== 1) {
+                $telegramUsername = $resolvedUsernames[$telegramId] ?? '';
+            }
             $rows[] = [
                 $index + 1,
                 $log['nama'] ?? '',
                 $log['no_wa'] ?? '',
-                $log['id_telegram'] ?? '',
+                $telegramId,
                 $log['id_hfm'] ?? '',
                 $log['tipe_aktivitas'] === 'kick_massal_lepas_ib'
                     ? 'Kick massal Lepas IB'
                     : 'Kick admin (status Lepas IB)',
                 $log['created_at'] ?? '',
             ];
+            if (preg_match('/^[A-Za-z][A-Za-z0-9_]{4,31}$/', $telegramUsername) === 1) {
+                $hyperlinks['D' . ($index + 2)] = 'https://t.me/' . $telegramUsername;
+            }
         }
 
         try {
@@ -379,7 +473,7 @@ class AdminDashboard extends BaseController
                 'ID Trading',
                 'Aktivitas',
                 'Waktu Kick',
-            ], $rows);
+            ], $rows, $hyperlinks);
         } catch (\Throwable $exception) {
             log_message('error', 'Gagal membuat ekspor Excel user terkick: ' . $exception->getMessage());
             return redirect()->to(base_url('AdminDashboard/memberLogs'))
@@ -475,8 +569,23 @@ class AdminDashboard extends BaseController
             );
         }
 
-        // Tombol Kick adalah satu-satunya aksi yang membersihkan roster Lepas IB.
-        // tb_member_logs tidak dihapus sehingga riwayat aktivitas tetap tersedia.
+        $clearedTelegramIds = [];
+        if (is_array($result['cleared_ids'] ?? null)) {
+            foreach ($result['cleared_ids'] as $telegramId) {
+                $telegramId = trim((string) $telegramId);
+                if ($telegramId !== '' && ctype_digit($telegramId)) {
+                    $clearedTelegramIds[$telegramId] = $telegramId;
+                }
+            }
+            $clearedTelegramIds = array_values($clearedTelegramIds);
+        }
+        $rosterCleanupTelegramIds = array_values(array_unique(array_merge(
+            $kickedTelegramIds,
+            $clearedTelegramIds
+        )));
+
+        // Hanya user yang berhasil dikick atau sudah dipastikan tidak berada di grup
+        // yang boleh dibersihkan dari roster. tb_member_logs selalu dipertahankan.
         $db->transBegin();
         if ($this->hasMemberLogTelegramColumn($db)) {
             $db->query(
@@ -523,8 +632,14 @@ class AdminDashboard extends BaseController
             return redirect()->to(base_url('AdminDashboard/memberLogs'))
                 ->with('error', 'Kick selesai, tetapi ID Telegram pada riwayat tidak berhasil dipertahankan. Data roster tidak dihapus.');
         }
-        $db->table('tb_member_vip')->where('status', 'lepas_ib')->delete();
-        $removedFromDashboard = $db->affectedRows();
+        $removedFromDashboard = 0;
+        if ($rosterCleanupTelegramIds !== []) {
+            $db->table('tb_member_vip')
+                ->where('status', 'lepas_ib')
+                ->whereIn('id_telegram', $rosterCleanupTelegramIds)
+                ->delete();
+            $removedFromDashboard = $db->affectedRows();
+        }
         if (!$db->transStatus()) {
             $db->transRollback();
             return redirect()->to(base_url('AdminDashboard/memberLogs'))
@@ -533,10 +648,11 @@ class AdminDashboard extends BaseController
         $db->transCommit();
 
         $summary = sprintf(
-            'Proses grup %s selesai. Kandidat: %d; berhasil dikeluarkan: %d; dilewati: %d; gagal: %d; data Lepas IB di dashboard dihapus: %d. Riwayat aktivitas tetap tersimpan.',
+            'Proses grup %s selesai. Kandidat: %d; berhasil dikeluarkan: %d; sudah tidak berada di grup: %d; dilewati: %d; gagal: %d; data Lepas IB di dashboard dihapus: %d. Riwayat aktivitas tetap tersimpan.',
             (string) ($result['group_name'] ?? 'Telegram VIP'),
             (int) ($result['candidates'] ?? 0),
             (int) ($result['kicked'] ?? 0),
+            count($clearedTelegramIds),
             (int) ($result['skipped'] ?? 0),
             (int) ($result['failed'] ?? 0),
             $removedFromDashboard,

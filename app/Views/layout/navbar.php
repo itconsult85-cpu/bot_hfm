@@ -1,25 +1,88 @@
-<nav class="navbar navbar-expand bg-white border-bottom sticky-top py-3 shadow-sm">
-    <div class="container d-flex align-items-center">
-        <button class="btn btn-light border-0 me-3 d-flex align-items-center justify-content-center" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasSidebar" style="width: 45px; height: 45px; border-radius: 12px;">
-            <i class="bi bi-list fs-4"></i>
-        </button>
-
-        <a class="navbar-brand text-primary fw-bold fs-4 me-auto" href="<?= base_url('AdminDashboard') ?>">
-            <i class="bi bi-graph-up-arrow me-2"></i>BOSSCUAN VIP
-        </a>
-
-        <div class="dropdown">
-            <button class="btn btn-light border rounded-pill px-3 py-1 dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown">
-                <i class="bi bi-person-circle me-2 text-primary fs-5"></i>
-                <span class="d-none d-sm-inline fw-semibold"><?= session()->get('nama') ?? 'Administrator' ?></span>
+<nav class="app-header navbar navbar-expand bg-body" aria-label="Navigasi atas">
+    <div class="container-fluid navbar-inner">
+        <div class="navbar-leading">
+            <button class="btn sidebar-toggle-button" type="button" data-lte-toggle="sidebar"
+                aria-label="Buka atau tutup navigasi" title="Buka/tutup sidebar">
+                <span class="hamburger-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+                <span class="visually-hidden">Buka atau tutup navigasi</span>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end mt-2 shadow border-0" style="border-radius: 12px;">
-                <li>
-                    <a class="dropdown-item text-danger fw-semibold py-2" href="<?= base_url('auth/logout') ?>">
-                        <i class="bi bi-box-arrow-right me-2"></i>Logout
-                    </a>
-                </li>
-            </ul>
+            <div class="topbar-context d-none d-sm-flex" aria-label="BOSSCUAN Admin Console">
+                <span class="topbar-context-brand">BOSSCUAN</span>
+                <span class="topbar-context-divider" aria-hidden="true">/</span>
+                <span class="topbar-context-label">Admin Console</span>
+            </div>
+        </div>
+
+        <div class="navbar-actions">
+            <!-- <div class="dropdown">
+                <button class="btn navbar-icon-button" type="button" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Buka pusat notifikasi" title="Notifikasi">
+                    <i class="bi bi-bell" aria-hidden="true"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end notification-menu" aria-labelledby="notificationDropdown">
+                    <li class="notification-menu-header">
+                        <div>
+                            <strong>Pusat notifikasi</strong>
+                            <small>Informasi dan aktivitas terbaru</small>
+                        </div>
+                        <i class="bi bi-bell text-primary" aria-hidden="true"></i>
+                    </li>
+                    <li>
+                        <div class="notification-empty-state">
+                            <span class="notification-empty-icon"><i class="bi bi-bell-slash" aria-hidden="true"></i></span>
+                            <strong>Belum ada item untuk ditampilkan</strong>
+                            <small>Gunakan pintasan di bawah untuk meninjau aktivitas.</small>
+                        </div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item notification-link" href="<?= base_url('AdminDashboard/memberLogs') ?>">
+                            <i class="bi bi-clock-history" aria-hidden="true"></i>
+                            <span>Aktivitas member</span>
+                            <i class="bi bi-arrow-up-right ms-auto notification-link-arrow" aria-hidden="true"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item notification-link" href="<?= base_url('activity-reminders') ?>">
+                            <i class="bi bi-person-check" aria-hidden="true"></i>
+                            <span>Evaluasi aktivitas</span>
+                            <i class="bi bi-arrow-up-right ms-auto notification-link-arrow" aria-hidden="true"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item notification-link" href="<?= base_url('chat-logs') ?>">
+                            <i class="bi bi-chat-left-text" aria-hidden="true"></i>
+                            <span>Log obrolan Telegram</span>
+                            <i class="bi bi-arrow-up-right ms-auto notification-link-arrow" aria-hidden="true"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div> -->
+
+            <div class="dropdown">
+                <button class="btn user-menu-button dropdown-toggle d-flex align-items-center" type="button"
+                    data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="user-menu-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
+                    <span
+                        class="user-menu-name d-none d-sm-inline"><?= esc(session()->get('nama') ?? 'Administrator') ?></span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end user-menu-dropdown">
+                    <li class="dropdown-header">
+                        <span class="user-menu-avatar user-menu-avatar-lg"><i class="bi bi-person-fill"
+                                aria-hidden="true"></i></span>
+                        <span
+                            class="d-block fw-semibold mt-2"><?= esc(session()->get('nama') ?? 'Administrator') ?></span>
+                        <small class="text-body-secondary">Administrator</small>
+                    </li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li>
+                        <a class="dropdown-item text-danger" href="<?= base_url('auth/logout') ?>">
+                            <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Keluar dari sistem
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
 </nav>

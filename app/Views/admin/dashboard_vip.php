@@ -1,17 +1,19 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-bs-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <title>VIP Console - HFM Manager</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard.css') ?>">
+    <meta name="theme-color" content="#212529">
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/overlayscrollbars/overlayscrollbars.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/admin-lte/adminlte.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard.css') ?>?v=<?= filemtime(FCPATH . 'assets/css/dashboard.css') ?>">
 </head>
 
 <body class="vip-console">
-    <nav class="navbar navbar-expand-lg navbar-white bg-white border-bottom sticky-top py-3 shadow-sm">
+    <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom sticky-top py-3 shadow-sm">
         <div class="container">
             <span class="navbar-brand text-primary fs-4"><i class="bi bi-graph-up-arrow me-2"></i>VIP Console</span>
             <a href="<?= base_url('logout') ?>" class="btn btn-outline-danger btn-sm rounded-pill px-4 fw-semibold"><i class="bi bi-box-arrow-right me-1"></i>Keluar</a>
@@ -167,7 +169,10 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="<?= base_url('assets/vendor/popper/popper.min.js') ?>"></script>
+    <script src="<?= base_url('assets/vendor/bootstrap/bootstrap.min.js') ?>"></script>
+    <script src="<?= base_url('assets/vendor/overlayscrollbars/overlayscrollbars.browser.es6.min.js') ?>"></script>
+    <script src="<?= base_url('assets/vendor/admin-lte/adminlte.min.js') ?>"></script>
     <script>
         document.querySelectorAll('.btn-edit').forEach(btn => {
             btn.addEventListener('click', function() {

@@ -7,6 +7,20 @@ const cron = require("node-cron");
 const Tesseract = require("tesseract.js");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { execFile } = require("child_process");
+// Selalu muat konfigurasi dari folder bot, bukan process.cwd() (yang bisa berbeda saat dijalankan via PM2).
+require("dotenv").config({ path: require("path").resolve(__dirname, ".env") });
+// MTProto bersifat opsional agar bot utama tetap dapat berjalan
+// bila dependency scan anggota Telegram belum dipasang di server.
+let TelegramClient = null;
+let StringSession = null;
+try {
+  ({ TelegramClient } = require("telegram"));
+  ({ StringSession } = require("telegram/sessions"));
+} catch (error) {
+  console.warn(
+    "[MTPROTO DISABLED] Dependency 'telegram' belum terpasang; fitur scan anggota Telegram dinonaktifkan.",
+  );
+}
 
 // 1. EXPRESS & PORT MANAGEMENT
 const app = express();
@@ -162,6 +176,8 @@ const validatedUsers = new Set();
 const antrianBot = [];
 let sedangAntriBot = false;
 let bulkKickLepasIbRunning = false;
+let mtprotoClient = null;
+let mtprotoConnectPromise = null;
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 function getBotControlToken() {
@@ -231,6 +247,56 @@ async function getConfiguredTelegramGroup(allowLegacyFallback = true) {
   return fallbackGroup.group_id ? fallbackGroup : null;
 }
 
+function getMtprotoConfig() {
+  const apiId = Number(process.env.MTPROTO_API_ID || "0");
+  const apiHash = String(process.env.MTPROTO_API_HASH || "").trim();
+  const session = String(process.env.MTPROTO_SESSION || "").trim();
+  const scanLimit = Math.max(
+    1,
+    Math.min(Number(process.env.MTPROTO_SCAN_LIMIT || "100000"), 500000),
+  );
+  return { apiId, apiHash, session, scanLimit };
+}
+
+async function getMtprotoClient() {
+  const config = getMtprotoConfig();
+  if (!TelegramClient || !StringSession) {
+    throw new Error(
+      "Dependency MTProto belum terpasang. Jalankan 'npm install' di folder bot lalu restart PM2.",
+    );
+  }
+  if (!config.apiId || !config.apiHash || !config.session) {
+    throw new Error(
+      "Konfigurasi MTProto belum lengkap. Isi MTPROTO_API_ID, MTPROTO_API_HASH, dan MTPROTO_SESSION pada .env di folder bot.",
+    );
+  }
+  if (mtprotoClient?.connected) return mtprotoClient;
+  if (mtprotoConnectPromise) return mtprotoConnectPromise;
+
+  mtprotoConnectPromise = (async () => {
+    const client = new TelegramClient(
+      new StringSession(config.session),
+      config.apiId,
+      config.apiHash,
+      { connectionRetries: 3 },
+    );
+    await client.connect();
+    if (!(await client.checkAuthorization())) {
+      throw new Error(
+        "SESSION MTProto belum terautentikasi. Jalankan scripts/create-mtproto-session.js terlebih dahulu.",
+      );
+    }
+    mtprotoClient = client;
+    return client;
+  })();
+
+  try {
+    return await mtprotoConnectPromise;
+  } finally {
+    mtprotoConnectPromise = null;
+  }
+}
+
 async function saveTelegramGroupMembership(groupId, groupName, member, status) {
   try {
     if (!(await hasDatabaseTable("telegram_group_members"))) return false;
@@ -243,31 +309,59 @@ async function saveTelegramGroupMembership(groupId, groupName, member, status) {
         .slice(0, 150) ||
       member.username ||
       "Pengguna Telegram";
+    const telegramUsername = String(member.username || "").replace(/^@/, "").trim() || null;
     let phoneNumber = null;
     const [vipRows] = await db.query(
       "SELECT no_wa FROM tb_member_vip WHERE TRIM(id_telegram) = ? LIMIT 1",
       [telegramId],
     );
     phoneNumber = vipRows[0]?.no_wa || null;
-    await db.query(
-      `INSERT INTO telegram_group_members
-        (telegram_id, phone_number, display_name, group_id, group_name, status, joined_at, left_at)
-       VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
-       ON DUPLICATE KEY UPDATE
-        phone_number = VALUES(phone_number), display_name = VALUES(display_name),
-        group_name = VALUES(group_name), status = VALUES(status),
-        joined_at = IF(VALUES(status) = 'active', NOW(), joined_at),
-        left_at = IF(VALUES(status) = 'left', NOW(), NULL), updated_at = NOW()`,
-      [
-        telegramId,
-        phoneNumber,
-        displayName,
-        String(groupId),
-        groupName || null,
-        status,
-        status === "left" ? new Date() : null,
-      ],
+    const hasUsernameColumn = await hasDatabaseColumn(
+      "telegram_group_members",
+      "telegram_username",
     );
+    if (hasUsernameColumn) {
+      await db.query(
+        `INSERT INTO telegram_group_members
+          (telegram_id, telegram_username, phone_number, display_name, group_id, group_name, status, joined_at, left_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+         ON DUPLICATE KEY UPDATE
+          telegram_username = VALUES(telegram_username), phone_number = VALUES(phone_number),
+          display_name = VALUES(display_name), group_name = VALUES(group_name), status = VALUES(status),
+          joined_at = IF(VALUES(status) = 'active', NOW(), joined_at),
+          left_at = IF(VALUES(status) = 'left', NOW(), NULL), updated_at = NOW()`,
+        [
+          telegramId,
+          telegramUsername,
+          phoneNumber,
+          displayName,
+          String(groupId),
+          groupName || null,
+          status,
+          status === "left" ? new Date() : null,
+        ],
+      );
+    } else {
+      await db.query(
+        `INSERT INTO telegram_group_members
+          (telegram_id, phone_number, display_name, group_id, group_name, status, joined_at, left_at)
+         VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
+         ON DUPLICATE KEY UPDATE
+          phone_number = VALUES(phone_number), display_name = VALUES(display_name),
+          group_name = VALUES(group_name), status = VALUES(status),
+          joined_at = IF(VALUES(status) = 'active', NOW(), joined_at),
+          left_at = IF(VALUES(status) = 'left', NOW(), NULL), updated_at = NOW()`,
+        [
+          telegramId,
+          phoneNumber,
+          displayName,
+          String(groupId),
+          groupName || null,
+          status,
+          status === "left" ? new Date() : null,
+        ],
+      );
+    }
     return true;
   } catch (error) {
     console.error("[TELEGRAM GROUP MEMBER ERROR]", error.message);
@@ -308,6 +402,168 @@ app.get("/api/capabilities", (req, res) => {
     return res.status(401).json({ status: "failed", error: "Unauthorized." });
   }
   return res.json({ status: "success", capabilities: { bulk_kick_ids: true } });
+});
+
+app.get("/api/mtproto-group-members", async (req, res) => {
+  if (!hasValidControlToken(req)) {
+    return res.status(401).json({ status: "failed", error: "Unauthorized." });
+  }
+
+  try {
+    if (!(await fetchConfig())) {
+      return res.status(503).json({
+        status: "failed",
+        error: "Konfigurasi bot tidak dapat dimuat dari database.",
+      });
+    }
+
+    const group = await getConfiguredTelegramGroup(false);
+    const groupId = String(group?.group_id || "").trim();
+    if (!groupId) {
+      return res.status(409).json({
+        status: "failed",
+        error: "Grup Telegram aktif belum dikonfigurasi.",
+      });
+    }
+
+    const config = getMtprotoConfig();
+    const client = await getMtprotoClient();
+    const entity = await client.getEntity(groupId);
+    const members = [];
+    for await (const user of client.iterParticipants(entity, {
+      limit: config.scanLimit,
+    })) {
+      members.push({
+        telegram_id: String(user.id),
+        username: user.username || null,
+        first_name: user.firstName || null,
+        last_name: user.lastName || null,
+        is_bot: Boolean(user.bot),
+        is_deleted: Boolean(user.deleted),
+      });
+    }
+
+    return res.json({
+      status: "success",
+      read_only: true,
+      group_id: groupId,
+      group_name: group.group_name || "Grup Telegram",
+      scan_limit: config.scanLimit,
+      total: members.length,
+      members,
+    });
+  } catch (error) {
+    console.error("[MTPROTO MEMBER SCAN ERROR]", error.message);
+    return res.status(502).json({
+      status: "failed",
+      error: error.message || "Gagal membaca anggota grup Telegram.",
+    });
+  }
+});
+
+app.post("/api/resolve-telegram-usernames", async (req, res) => {
+  if (!hasValidControlToken(req)) {
+    return res.status(401).json({ status: "failed", error: "Unauthorized." });
+  }
+  if (!bot) {
+    return res.status(503).json({ status: "failed", error: "Bot Telegram belum terhubung." });
+  }
+
+  try {
+    if (!(await hasDatabaseTable("chat_logs_tele"))) {
+      return res.status(503).json({ status: "failed", error: "Tabel chat_logs_tele belum tersedia." });
+    }
+    const requestedIds = Array.isArray(req.body?.telegram_ids)
+      ? [...new Set(req.body.telegram_ids.map((id) => String(id).trim()))]
+          .filter((id) => /^[1-9][0-9]*$/.test(id))
+          .slice(0, 500)
+      : [];
+    if (requestedIds.length === 0) {
+      return res.json({ status: "success", usernames: {}, checked: 0 });
+    }
+
+    // Hanya lookup ID yang memang pernah tercatat sebagai pengirim chat ke bot.
+    const placeholders = requestedIds.map(() => "?").join(",");
+    const [loggedUsers] = await db.query(
+      `SELECT DISTINCT TRIM(phone_number) AS telegram_id
+       FROM chat_logs_tele
+       WHERE TRIM(phone_number) IN (${placeholders})`,
+      requestedIds,
+    );
+    const loggedIds = new Set(loggedUsers.map((row) => String(row.telegram_id)));
+    const usernames = {};
+    const diagnostics = {
+      found_in_chat_logs: loggedIds.size,
+      not_found_in_chat_logs: requestedIds.length - loggedIds.size,
+      bot_api_chat_returned: 0,
+      bot_api_error: 0,
+      bot_api_username_missing: 0,
+      mtproto_attempted: 0,
+      mtproto_entity_returned: 0,
+      mtproto_error: 0,
+      mtproto_username_missing: 0,
+    };
+    const canStoreUsername =
+      (await hasDatabaseTable("telegram_group_members")) &&
+      (await hasDatabaseColumn("telegram_group_members", "telegram_username"));
+
+    for (const telegramId of requestedIds) {
+      if (!loggedIds.has(telegramId)) continue;
+      let username = "";
+      let botApiReturned = false;
+      try {
+        const chat = await bot.telegram.getChat(telegramId);
+        botApiReturned = true;
+        diagnostics.bot_api_chat_returned++;
+        username = String(chat.username || "").replace(/^@/, "").trim();
+      } catch (error) {
+        // Jika private chat tidak dapat diakses oleh Bot API, lanjutkan mencoba MTProto.
+        diagnostics.bot_api_error++;
+      }
+      if (!/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(username) && botApiReturned) {
+        diagnostics.bot_api_username_missing++;
+      }
+      if (!/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(username)) {
+        diagnostics.mtproto_attempted++;
+        try {
+          const mtprotoClient = await getMtprotoClient();
+          const entity = await mtprotoClient.getEntity(telegramId);
+          diagnostics.mtproto_entity_returned++;
+          username = String(entity.username || "").replace(/^@/, "").trim();
+          if (!/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(username)) {
+            diagnostics.mtproto_username_missing++;
+          }
+        } catch (error) {
+          // ID tanpa access hash/entity yang dikenal mungkin tidak dapat dicari lewat MTProto.
+          diagnostics.mtproto_error++;
+        }
+      }
+      if (/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(username)) {
+        usernames[telegramId] = username;
+        if (canStoreUsername) {
+          await db.query(
+            "UPDATE telegram_group_members SET telegram_username = ? WHERE telegram_id = ?",
+            [username, telegramId],
+          );
+        }
+      }
+      await delay(50);
+    }
+
+    return res.json({
+      status: "success",
+      usernames,
+      checked: loggedIds.size,
+      limited: requestedIds.length >= 500,
+      diagnostics,
+    });
+  } catch (error) {
+    console.error("[TELEGRAM USERNAME LOOKUP ERROR]", error.message);
+    return res.status(502).json({
+      status: "failed",
+      error: "Gagal mencari username Telegram dari riwayat chat bot.",
+    });
+  }
 });
 
 app.post("/api/kick-lepas-ib-members", async (req, res) => {
@@ -383,6 +639,7 @@ app.post("/api/kick-lepas-ib-members", async (req, res) => {
       candidates: candidates.length,
       kicked: 0,
       kicked_ids: [],
+      cleared_ids: [],
       skipped: 0,
       failed: 0,
       failed_ids: [],
@@ -439,6 +696,7 @@ app.post("/api/kick-lepas-ib-members", async (req, res) => {
             [telegramId, groupId],
           );
           if (leftRows.length > 0) {
+            result.cleared_ids.push(telegramId);
             result.skipped += 1;
             continue;
           }
@@ -460,6 +718,7 @@ app.post("/api/kick-lepas-ib-members", async (req, res) => {
               member.user,
               "left",
             );
+            result.cleared_ids.push(telegramId);
           }
           result.skipped += 1;
           continue;
@@ -1076,6 +1335,74 @@ async function initTelegramBot() {
     bot = new Telegraf(TELEGRAM_TOKEN);
     botStatus = { status: "Connected via Database" };
     const ID_GRUP_VIP = botSettings.globals.ID_GRUP_VIP;
+
+    bot.command("kurs", async (ctx) => {
+      const adminId = String(botSettings.globals.ID_ADMIN || "").trim();
+      const senderId = String(ctx.from?.id || "").trim();
+      if (!adminId || senderId !== adminId) {
+        return ctx.reply("Perintah ini hanya dapat digunakan oleh admin.");
+      }
+
+      try {
+        const controlToken = getBotControlToken();
+        if (!controlToken) {
+          return ctx.reply("BOT_CONTROL_TOKEN belum dikonfigurasi.");
+        }
+
+        const response = await axios.get(
+          `${getCiBaseUrl()}/client/apiKursTerbaru`,
+          {
+            timeout: 10000,
+            headers: { "X-Bot-Control-Token": controlToken },
+          },
+        );
+        const data = response.data || {};
+        if (data.status !== "ok") {
+          throw new Error(data.message || "Kurs tidak tersedia.");
+        }
+
+        const rate = Number(data.rate);
+        const usdMinimum = Number(data.minimum_usd);
+        const uscMinimum = Number(data.minimum_usc);
+        const fetchedAt = data.fetched_at
+          ? new Date(Number(data.fetched_at) * 1000).toLocaleString("id-ID", {
+              timeZone: "Asia/Jakarta",
+            })
+          : "-";
+        const message = [
+          "💱 KURS TERBARU",
+          "",
+          `USD/IDR: Rp${rate.toLocaleString("id-ID", { maximumFractionDigits: 0 })} per 1 USD`,
+          `Tanggal referensi: ${data.rate_date || "-"}`,
+          `Diambil: ${fetchedAt} WIB`,
+          "",
+          "Konversi minimum deposit:",
+          "• IDR: Rp100.000",
+          `• USD: sekitar $${usdMinimum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          `• USC: sekitar ${uscMinimum.toLocaleString("id-ID")} USC`,
+          "",
+          "Sumber: ExchangeRateService",
+        ].join("\n");
+        return ctx.reply(message);
+      } catch (error) {
+        const httpStatus = error.response?.status;
+        const apiMessage = String(
+          error.response?.data?.message || error.response?.data?.error || "",
+        ).trim();
+        console.error("[KURS COMMAND ERROR]", {
+          message: error.message,
+          httpStatus,
+          apiMessage,
+          url: `${getCiBaseUrl()}/client/apiKursTerbaru`,
+        });
+        const detail = httpStatus
+          ? `CI4 HTTP ${httpStatus}${apiMessage ? `: ${apiMessage}` : ""}`
+          : error.code === "ECONNABORTED"
+            ? "CI4 timeout"
+            : "endpoint CI4 tidak dapat dihubungi";
+        return ctx.reply(`Kurs belum dapat diambil (${detail}).`);
+      }
+    });
 
     bot.on(["text", "photo"], async (ctx) => {
       antrianBot.push(async () => {

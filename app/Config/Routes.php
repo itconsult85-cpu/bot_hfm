@@ -111,6 +111,7 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
         $routes->post('reset', 'UserProgress::resetProgress');
     });
     $routes->get('group-memberships', 'GroupMembership::index');
+    $routes->get('mtproto-group-members', 'MtprotoGroupMembers::index');
 
     $routes->group('chat-logs', function ($routes) {
         $routes->get('/', 'ChatLogTele::index');
@@ -133,6 +134,7 @@ $routes->post('client/prosesFollowUp', 'Client::prosesFollowUp');
 $routes->post('client/run-activity-reminders', 'ActivityReminder::runScheduled');
 $routes->get('client/bot-schedules', 'BotSchedule::api');
 $routes->get('client/apiGroupLinks', 'Client::apiGroupLinks');
+$routes->get('client/apiKursTerbaru', 'Client::apiKursTerbaru');
 $routes->post('client/apiWhatsAppGroupJoin', 'Client::apiWhatsAppGroupJoin');
 $routes->get('client/apiHapusMemberGrup/(:any)', 'Client::apiHapusMemberGrup/$1');
 $routes->get('client/apiLaporanHarian', 'Client::apiLaporanHarian');

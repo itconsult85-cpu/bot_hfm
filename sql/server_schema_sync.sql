@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS `whatsapp_group_members` (
 CREATE TABLE IF NOT EXISTS `telegram_group_members` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `telegram_id` VARCHAR(50) NOT NULL,
+  `telegram_username` VARCHAR(32) DEFAULT NULL,
   `phone_number` VARCHAR(30) DEFAULT NULL,
   `display_name` VARCHAR(150) DEFAULT NULL,
   `group_id` VARCHAR(100) NOT NULL,

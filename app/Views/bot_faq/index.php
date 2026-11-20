@@ -27,7 +27,7 @@
         width: 100%;
         margin: 0 !important;
         padding: .15rem 0;
-        color: #64748b;
+        color: var(--bs-secondary-color);
         font-size: .82rem;
         line-height: 1.5;
         white-space: pre-line !important;
@@ -45,11 +45,11 @@
         width: fit-content;
         max-width: 100%;
         padding: .4rem .55rem;
-        border: 1px solid #bfdbfe;
-        border-left: 3px solid #60a5fa;
+        border: 1px solid var(--bs-primary-border-subtle);
+        border-left: 3px solid var(--bs-primary);
         border-radius: .35rem;
-        background: #eff6ff;
-        color: #1d4ed8;
+        background: var(--bs-primary-bg-subtle);
+        color: var(--bs-primary-text-emphasis);
         font-size: .8rem;
         font-weight: 600;
         line-height: 1.35;

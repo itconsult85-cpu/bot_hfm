@@ -160,7 +160,7 @@
                     [7, 'desc']
                 ],
                 language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/id.json'
+                    url: '<?= base_url('assets/vendor/datatables/i18n/id.json') ?>'
                 }
             });
         });
@@ -177,8 +177,8 @@
                 datasets: [{
                     label: 'Registrations',
                     data: <?= json_encode($counts) ?>,
-                    borderColor: '#0d6efd',
-                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderColor: '#6ea8fe',
+                    backgroundColor: 'rgba(110, 168, 254, 0.16)',
                     fill: true,
                     tension: 0.4
                 }]
@@ -189,14 +189,28 @@
                 plugins: {
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#343a40',
+                        titleColor: '#f8f9fa',
+                        bodyColor: '#dee2e6',
+                        borderColor: '#495057',
+                        borderWidth: 1,
+                        padding: 12
                     }
                 },
                 scales: {
+                    x: {
+                        ticks: { color: '#adb5bd' },
+                        grid: { color: 'rgba(222, 226, 230, .08)' }
+                    },
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            stepSize: 1
-                        }
+                            stepSize: 1,
+                            color: '#adb5bd'
+                        },
+                        grid: { color: 'rgba(222, 226, 230, .08)' }
                     }
                 }
             }
