@@ -147,6 +147,50 @@ app.listen(API_PORT, () => {
   );
 });
 
+app.post("/admin/resend-telegram-invite", async (req, res) => {
+  if (!hasValidControlToken(req)) {
+    return res.status(403).json({ status: "error", message: "Token bot tidak valid." });
+  }
+
+  const idHfm = String(req.body?.id_hfm || "").trim();
+  if (!/^\d{5,15}$/.test(idHfm)) {
+    return res.status(400).json({ status: "error", message: "ID HFM tidak valid." });
+  }
+
+  try {
+    const [rows] = await db.query(
+      "SELECT id_hfm, nama, id_telegram, status FROM tb_member_vip WHERE id_hfm = ? ORDER BY id DESC LIMIT 1",
+      [idHfm],
+    );
+    const member = rows[0];
+    if (!member || String(member.status || "").toLowerCase() !== "aktif") {
+      return res.status(404).json({ status: "error", message: "Member aktif tidak ditemukan." });
+    }
+    if (!/^\d{5,20}$/.test(String(member.id_telegram || "").trim())) {
+      return res.status(400).json({ status: "error", message: "ID Telegram member belum tercatat atau tidak valid." });
+    }
+
+    const result = await sendTrackedTelegramInvite({
+      telegramId: String(member.id_telegram).trim(),
+      idHfm: String(member.id_hfm),
+      displayName: String(member.nama || "Kak"),
+      source: "admin",
+      bypassCooldown: true,
+    });
+
+    if (result.status === "sent") {
+      return res.json({ status: "success", message: "Tautan invite berhasil dikirim melalui chat pribadi Telegram." });
+    }
+    if (result.status === "already_member") {
+      return res.status(409).json({ status: "error", message: "Member sudah tercatat berada di grup Telegram." });
+    }
+    return res.status(400).json({ status: "error", message: result.message || "Invite tidak dapat dikirim." });
+  } catch (error) {
+    console.error("[ADMIN RESEND INVITE ERROR]", error.message);
+    return res.status(500).json({ status: "error", message: "Gagal mengirim invite. Pastikan bot aktif dan pengguna sudah pernah membuka chat bot." });
+  }
+});
+
 // 2. KONEKSI DATABASE MYSQL
 const db = mysql.createPool({
   host: "localhost",
@@ -247,6 +291,201 @@ async function getConfiguredTelegramGroup(allowLegacyFallback = true) {
   return fallbackGroup.group_id ? fallbackGroup : null;
 }
 
+const INVITE_LIFETIME_SECONDS = 60;
+const USER_INVITE_COOLDOWN_SECONDS = 60;
+let inviteCleanupTimer = null;
+let inviteCleanupRunning = false;
+
+async function deleteTrackedInviteMessage(logId, telegramId, messageId) {
+  if (!bot || !messageId) return;
+  try {
+    await bot.telegram.deleteMessage(String(telegramId), Number(messageId));
+    await db.query(
+      "UPDATE telegram_invite_logs SET delete_status = 'deleted', deleted_at = NOW(), error_message = NULL WHERE id = ?",
+      [logId],
+    );
+  } catch (error) {
+    const message = String(error.description || error.message || "").slice(0, 500);
+    if (/message to delete not found|message not found/i.test(message)) {
+      await db.query(
+        "UPDATE telegram_invite_logs SET delete_status = 'deleted', deleted_at = NOW(), error_message = NULL WHERE id = ?",
+        [logId],
+      );
+      return;
+    }
+    const [rows] = await db.query(
+      "SELECT delete_attempts FROM telegram_invite_logs WHERE id = ? LIMIT 1",
+      [logId],
+    );
+    const attempts = Number(rows[0]?.delete_attempts || 0) + 1;
+    await db.query(
+      "UPDATE telegram_invite_logs SET delete_attempts = ?, delete_status = ?, error_message = ? WHERE id = ?",
+      [attempts, attempts >= 20 ? "failed" : "pending", message, logId],
+    );
+    console.warn(`[INVITE MESSAGE DELETE] ID ${logId}, attempt ${attempts}: ${message}`);
+  }
+}
+
+async function cleanupExpiredInviteMessages() {
+  if (!bot || inviteCleanupRunning) return;
+  inviteCleanupRunning = true;
+  try {
+    if (!(await hasDatabaseTable("telegram_invite_logs"))) return;
+    const [rows] = await db.query(
+      `SELECT id, telegram_id, message_id
+       FROM telegram_invite_logs
+       WHERE status = 'sent' AND delete_status = 'pending'
+         AND message_id IS NOT NULL AND expires_at <= NOW()
+       ORDER BY expires_at ASC LIMIT 100`,
+    );
+    for (const row of rows) {
+      await deleteTrackedInviteMessage(row.id, row.telegram_id, row.message_id);
+    }
+  } catch (error) {
+    console.error("[INVITE CLEANUP ERROR]", error.message);
+  } finally {
+    inviteCleanupRunning = false;
+  }
+}
+
+async function sendTrackedTelegramInvite({
+  telegramId,
+  idHfm = "",
+  displayName = "Kak",
+  source = "user_request",
+  messageText = "",
+  bypassCooldown = false,
+}) {
+  const targetTelegramId = String(telegramId || "").trim();
+  if (!/^\d{5,20}$/.test(targetTelegramId)) {
+    return { status: "error", message: "ID Telegram tidak valid." };
+  }
+  if (!bot) return { status: "error", message: "Bot Telegram belum siap." };
+  if (!(await hasDatabaseTable("telegram_invite_logs"))) {
+    return { status: "error", message: "Tabel telegram_invite_logs belum dibuat. Jalankan migration CI4 terlebih dahulu." };
+  }
+
+  const requestedHfmId = String(idHfm || "").trim();
+  const [memberRows] = await db.query(
+    `SELECT id_hfm, nama, status FROM tb_member_vip
+     WHERE TRIM(id_telegram) = ? AND status = 'aktif'
+       AND (? = '' OR id_hfm = ?)
+     ORDER BY updated_at DESC, id DESC LIMIT 1`,
+    [targetTelegramId, requestedHfmId, requestedHfmId],
+  );
+  const member = memberRows[0];
+  if (!member) {
+    return { status: "not_registered", message: "Tidak ditemukan pendaftaran aktif yang terhubung dengan ID Telegram ini." };
+  }
+
+  const configuredGroup = await getConfiguredTelegramGroup(true);
+  const groupId = String(configuredGroup?.group_id || "").trim();
+  if (!groupId) {
+    return { status: "error", message: "ID grup Telegram VIP belum dikonfigurasi." };
+  }
+
+  const inviteSource = String(source || "user_request").slice(0, 30);
+  const recordOutcome = async (status, errorMessage = null) => {
+    await db.query(
+      `INSERT INTO telegram_invite_logs
+        (id_hfm, telegram_id, group_id, invite_source, status, delete_status, error_message)
+       VALUES (?, ?, ?, ?, ?, 'not_applicable', ?)`,
+      [String(member.id_hfm), targetTelegramId, groupId, inviteSource, status, errorMessage],
+    );
+  };
+
+  try {
+    const chatMember = await bot.telegram.getChatMember(groupId, Number(targetTelegramId));
+    if (["creator", "administrator", "member"].includes(chatMember.status)
+        || (chatMember.status === "restricted" && chatMember.is_member)) {
+      await recordOutcome("already_member");
+      return { status: "already_member", message: "Member sudah berada di grup Telegram." };
+    }
+  } catch (error) {
+    console.warn("[INVITE MEMBERSHIP CHECK]", error.message);
+  }
+
+  if (["user_request", "start"].includes(inviteSource) && !bypassCooldown) {
+    const [recentRows] = await db.query(
+      `SELECT GREATEST(1, ? - TIMESTAMPDIFF(SECOND, sent_at, NOW())) AS retry_after
+       FROM telegram_invite_logs
+       WHERE telegram_id = ? AND status = 'sent'
+         AND sent_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
+       ORDER BY sent_at DESC LIMIT 1`,
+      [USER_INVITE_COOLDOWN_SECONDS, targetTelegramId, USER_INVITE_COOLDOWN_SECONDS],
+    );
+    if (recentRows.length) {
+      const retryAfter = Number(recentRows[0].retry_after || USER_INVITE_COOLDOWN_SECONDS);
+      await recordOutcome("rate_limited", `Pengguna dapat meminta ulang setelah ${retryAfter} detik.`);
+      return {
+        status: "rate_limited",
+        retryAfter,
+        message: `Tautan baru saja dikirim. Silakan minta ulang setelah ${retryAfter} detik.`,
+      };
+    }
+  }
+
+  const [insertResult] = await db.query(
+    `INSERT INTO telegram_invite_logs
+      (id_hfm, telegram_id, group_id, invite_source, status, expires_at, delete_status)
+     VALUES (?, ?, ?, ?, 'pending', DATE_ADD(NOW(), INTERVAL ? SECOND), 'pending')`,
+    [String(member.id_hfm), targetTelegramId, groupId, inviteSource, INVITE_LIFETIME_SECONDS],
+  );
+  const logId = insertResult.insertId;
+  let createdInvite = null;
+  let sentMessage = null;
+
+  try {
+    createdInvite = await bot.telegram.createChatInviteLink(groupId, {
+      expire_date: Math.floor(Date.now() / 1000) + INVITE_LIFETIME_SECONDS,
+      member_limit: 1,
+    });
+    const greeting = String(displayName || member.nama || "Kak").trim();
+    const text = messageText ||
+      `Halo ${greeting}, berikut tautan sekali pakai untuk bergabung ke Grup VIP. Tautan berlaku 1 menit dan pesan ini akan dihapus otomatis setelah 1 menit.`;
+    sentMessage = await bot.telegram.sendMessage(targetTelegramId, text, {
+      reply_markup: {
+        inline_keyboard: [[{ text: "Gabung Grup VIP", url: createdInvite.invite_link }]],
+      },
+    });
+    await db.query(
+      `UPDATE telegram_invite_logs
+       SET status = 'sent', message_id = ?, sent_at = NOW(),
+           expires_at = DATE_ADD(NOW(), INTERVAL ? SECOND), error_message = NULL
+       WHERE id = ?`,
+      [sentMessage.message_id, INVITE_LIFETIME_SECONDS, logId],
+    );
+    setTimeout(() => {
+      deleteTrackedInviteMessage(logId, targetTelegramId, sentMessage.message_id).catch((error) =>
+        console.error("[INVITE MESSAGE DELETE ERROR]", error.message),
+      );
+    }, INVITE_LIFETIME_SECONDS * 1000).unref?.();
+
+    return { status: "sent", logId, groupId };
+  } catch (error) {
+    if (sentMessage?.message_id) {
+      await bot.telegram.deleteMessage(targetTelegramId, sentMessage.message_id).catch(() => {});
+    }
+    if (createdInvite?.invite_link) {
+      try {
+        await bot.telegram.revokeChatInviteLink(groupId, createdInvite.invite_link);
+      } catch (revokeError) {
+        console.warn("[INVITE REVOKE ERROR]", revokeError.message);
+      }
+    }
+    const message = String(error.description || error.message || "Gagal mengirim invite.").slice(0, 500);
+    try {
+      await db.query(
+        "UPDATE telegram_invite_logs SET status = 'failed', delete_status = 'not_applicable', error_message = ? WHERE id = ?",
+        [message, logId],
+      );
+    } catch (logError) {
+      console.error("[INVITE FAILURE LOG ERROR]", logError.message);
+    }
+    return { status: "error", message: "Gagal mengirim pesan invite ke chat Telegram pengguna." };
+  }
+}
+
 function getMtprotoConfig() {
   const apiId = Number(process.env.MTPROTO_API_ID || "0");
   const apiHash = String(process.env.MTPROTO_API_HASH || "").trim();
@@ -256,6 +495,31 @@ function getMtprotoConfig() {
     Math.min(Number(process.env.MTPROTO_SCAN_LIMIT || "100000"), 500000),
   );
   return { apiId, apiHash, session, scanLimit };
+}
+
+async function handleVipInviteRequest(ctx) {
+  if (ctx.chat?.type !== "private") {
+    return ctx.reply("Permintaan invite hanya dapat dilakukan melalui chat pribadi dengan bot.");
+  }
+  let result;
+  try {
+    result = await sendTrackedTelegramInvite({
+      telegramId: String(ctx.from?.id || ""),
+      displayName: ctx.from?.first_name || "Kak",
+      source: "user_request",
+    });
+  } catch (error) {
+    console.error("[USER INVITE REQUEST ERROR]", error.message);
+    return ctx.reply("Invite belum dapat diproses saat ini. Silakan coba lagi atau hubungi admin.");
+  }
+  if (result.status === "sent") return;
+  if (result.status === "already_member") {
+    return ctx.reply("Akun Kakak sudah tercatat berada di Grup VIP, jadi tautan invite baru tidak diperlukan.");
+  }
+  if (result.status === "rate_limited") {
+    return ctx.reply(`Tautan invite baru saja dikirim. Silakan minta ulang setelah ${result.retryAfter} detik.`);
+  }
+  return ctx.reply(result.message || "Invite belum dapat dikirim. Silakan hubungi admin.");
 }
 
 async function getMtprotoClient() {
@@ -1429,6 +1693,11 @@ async function initTelegramBot() {
           }
           await ctx.sendChatAction("typing");
 
+          if (/^\/(?:invite|link)(?:@\w+)?(?:\s|$)/i.test(textMessage.trim())) {
+            await handleVipInviteRequest(ctx);
+            return;
+          }
+
           if (typeof userSteps[userId] === "undefined") userSteps[userId] = 1;
           let currentStep = userSteps[userId];
 
@@ -1451,16 +1720,20 @@ async function initTelegramBot() {
                 const wasAlreadyValidated = validatedUsers.has(userKey);
                 validatedUsers.add(userKey);
                 let isMember = false;
-                try {
-                  const member = await bot.telegram.getChatMember(
-                    ID_GRUP_VIP,
-                    parseInt(userId, 10),
-                  );
-                  isMember = ["creator", "administrator", "member"].includes(
-                    member.status,
-                  );
-                } catch (memberError) {
-                  console.warn("[VIP MEMBERSHIP CHECK]", memberError.message);
+                const currentVipGroup = await getConfiguredTelegramGroup(true);
+                const currentVipGroupId = String(currentVipGroup?.group_id || ID_GRUP_VIP || "").trim();
+                if (currentVipGroupId) {
+                  try {
+                    const member = await bot.telegram.getChatMember(
+                      currentVipGroupId,
+                      parseInt(userId, 10),
+                    );
+                    isMember = ["creator", "administrator", "member"].includes(
+                      member.status,
+                    ) || (member.status === "restricted" && member.is_member);
+                  } catch (memberError) {
+                    console.warn("[VIP MEMBERSHIP CHECK]", memberError.message);
+                  }
                 }
 
                 userSteps[userId] = 7;
@@ -1480,40 +1753,45 @@ async function initTelegramBot() {
 
                 if (wasAlreadyValidated) {
                   const invitedMessage =
-                    "Kak, akun kakak sudah tervalidasi dan undangan Grup VIP sudah diberikan. Bot ini hanya melayani pendaftaran.";
+                    "Kak, akun kakak sudah tervalidasi. Jika tautan sebelumnya tidak diterima atau sudah kedaluwarsa, tekan tombol di bawah atau ketik /invite untuk meminta tautan baru. Tautan berlaku 1 menit.";
                   await ctx.reply(invitedMessage, {
-                    reply_markup: { remove_keyboard: true },
+                    reply_markup: {
+                      inline_keyboard: [[{ text: "Minta link invite lagi", callback_data: "request_vip_invite" }]],
+                    },
                   });
                   await saveChatLog(userId, "bot", invitedMessage);
                   return;
                 }
 
-                const inviteLink = await bot.telegram.createChatInviteLink(
-                  ID_GRUP_VIP,
-                  {
-                    expire_date: Math.floor(Date.now() / 1000) + 60,
-                    member_limit: 1,
+                let inviteResult;
+                try {
+                  inviteResult = await sendTrackedTelegramInvite({
+                    telegramId: String(userId),
+                    displayName: userName,
+                    source: "start",
+                    messageText: `Status akun Kakak sudah tervalidasi. Tekan tombol di bawah untuk bergabung ke Grup VIP. Tautan berlaku 1 menit dan pesan ini akan dihapus otomatis setelah 1 menit.`,
+                  });
+                } catch (inviteError) {
+                  console.error("[START INVITE ERROR]", inviteError.message);
+                  inviteResult = { status: "error", message: "Sistem invite sedang mengalami gangguan." };
+                }
+                if (inviteResult.status === "sent") {
+                  await saveChatLog(userId, "bot", "Status tervalidasi; invite Grup VIP terkirim dan dicatat.");
+                  return;
+                }
+                if (inviteResult.status === "already_member") {
+                  await ctx.reply("Akun Kakak sudah tercatat bergabung di Grup VIP.", {
+                    reply_markup: { remove_keyboard: true },
+                  });
+                  return;
+                }
+                const inviteUnavailable = `Status akun Kakak sudah tervalidasi, tetapi invite belum berhasil dikirim. ${inviteResult.message || "Silakan coba /invite atau hubungi admin."}`;
+                await ctx.reply(inviteUnavailable, {
+                  reply_markup: {
+                    inline_keyboard: [[{ text: "Coba minta link invite", callback_data: "request_vip_invite" }]],
                   },
-                );
-                const inviteMessage =
-                  "Status akun kakak sudah tervalidasi. Silakan bergabung ke Grup VIP melalui tautan ini:\n" +
-                  inviteLink.invite_link;
-                const sentMsg = await ctx.reply(inviteMessage, {
-                  reply_markup: { remove_keyboard: true },
                 });
-                await saveChatLog(
-                  userId,
-                  "bot",
-                  "Status tervalidasi; tautan undangan Grup VIP sudah dikirim.",
-                );
-                setTimeout(async () => {
-                  try {
-                    await bot.telegram.deleteMessage(
-                      userId,
-                      sentMsg.message_id,
-                    );
-                  } catch (error) {}
-                }, 60000);
+                await saveChatLog(userId, "bot", "Status tervalidasi, tetapi invite belum berhasil dikirim.");
                 return;
               }
               validatedUsers.delete(userKey);
@@ -1539,9 +1817,11 @@ async function initTelegramBot() {
 
             if (validatedUsers.has(userKey)) {
               const registeredMessage =
-                "Kak, akun kakak sudah tervalidasi dan undangan Grup VIP sudah diberikan. Bot ini hanya melayani pendaftaran.";
+                "Kak, akun kakak sudah tervalidasi. Jika belum menerima tautan atau tautannya kedaluwarsa, tekan tombol di bawah atau ketik /invite untuk meminta ulang.";
               await ctx.reply(registeredMessage, {
-                reply_markup: { remove_keyboard: true },
+                reply_markup: {
+                  inline_keyboard: [[{ text: "Minta link invite lagi", callback_data: "request_vip_invite" }]],
+                },
               });
               return;
             }
@@ -1601,40 +1881,46 @@ async function initTelegramBot() {
               );
 
               if (resSave.data.status === "sukses") {
-                const inviteLink = await bot.telegram.createChatInviteLink(
-                  botSettings.globals.ID_GRUP_VIP,
-                  {
-                    expire_date: Math.floor(Date.now() / 1000) + 60,
-                    member_limit: 1,
-                  },
-                );
+                let inviteResult;
+                try {
+                  inviteResult = await sendTrackedTelegramInvite({
+                    telegramId: String(userId),
+                    idHfm: dataForm.id_hfm,
+                    displayName: dataForm.nama,
+                    source: "registration",
+                    messageText: `Selamat Kak ${dataForm.nama}! Data berhasil diverifikasi. Tekan tombol di bawah untuk bergabung ke Grup VIP. Tautan berlaku 1 menit dan pesan ini akan dihapus otomatis setelah 1 menit.`,
+                  });
+                } catch (inviteError) {
+                  console.error("[REGISTRATION INVITE ERROR]", inviteError.message);
+                  inviteResult = { status: "error", message: "Sistem invite sedang mengalami gangguan." };
+                }
 
-                const suksesMsg = `Selamat kak ${dataForm.nama}! Data berhasil diverifikasi.\n\nSilakan bergabung melalui link Grup VIP di bawah ini ya:\n👉 ${inviteLink.invite_link}\n\n_(Pesan otomatis ditarik dlm 1 menit)_`;
-
-                await bot.telegram
-                  .deleteMessage(ctx.chat.id, loadFormMsg.message_id)
-                  .catch(() => {});
-                const sentMsg = await ctx.reply(suksesMsg, {
-                  reply_markup: { remove_keyboard: true },
-                });
-                await saveChatLog(
-                  userId,
-                  "bot",
-                  "Berhasil registrasi form dan kirim link.",
-                );
+                if (inviteResult.status === "sent") {
+                  await bot.telegram.deleteMessage(ctx.chat.id, loadFormMsg.message_id).catch(() => {});
+                  await saveChatLog(userId, "bot", "Berhasil registrasi form; invite terkirim dan dicatat.");
+                } else if (inviteResult.status === "already_member") {
+                  await bot.telegram.deleteMessage(ctx.chat.id, loadFormMsg.message_id).catch(() => {});
+                  await ctx.reply("Data pendaftaran Kakak tersimpan dan akun Telegram ini sudah berada di Grup VIP.");
+                  await saveChatLog(userId, "bot", "Formulir tersimpan; user sudah berada di Grup VIP.");
+                } else {
+                  const failureMessage = `Data pendaftaran Kakak berhasil tersimpan, tetapi tautan invite belum berhasil dikirim. ${inviteResult.message || "Tekan tombol untuk mencoba lagi atau ketik /invite."}`;
+                  await ctx.telegram.editMessageText(
+                    ctx.chat.id,
+                    loadFormMsg.message_id,
+                    undefined,
+                    failureMessage,
+                    {
+                      reply_markup: {
+                        inline_keyboard: [[{ text: "Coba kirim invite", callback_data: "request_vip_invite" }]],
+                      },
+                    },
+                  );
+                  await saveChatLog(userId, "bot", "Formulir tersimpan, tetapi pengiriman invite gagal.");
+                }
                 validatedUsers.add(String(userId));
                 userSteps[userId] = 7;
                 delete userTempData[userId];
                 await logUserProgress(userId, userName, 7);
-
-                setTimeout(async () => {
-                  try {
-                    await bot.telegram.deleteMessage(
-                      userId,
-                      sentMsg.message_id,
-                    );
-                  } catch (e) {}
-                }, 60000);
               } else {
                 await ctx.telegram.editMessageText(
                   ctx.chat.id,
@@ -2070,6 +2356,11 @@ async function initTelegramBot() {
       jalankanAntrian();
     });
 
+    bot.action("request_vip_invite", async (ctx) => {
+      await ctx.answerCbQuery();
+      await handleVipInviteRequest(ctx);
+    });
+
     bot.on("new_chat_members", async (ctx) => {
       const configuredGroup = await getConfiguredTelegramGroup(true);
       const groupId = String(
@@ -2147,6 +2438,17 @@ async function initTelegramBot() {
     console.log(
       "[BOT] Telegram Bot Berhasil Berjalan dengan Konfigurasi MySQL!",
     );
+    cleanupExpiredInviteMessages().catch((error) =>
+      console.error("[INVITE CLEANUP STARTUP ERROR]", error.message),
+    );
+    if (!inviteCleanupTimer) {
+      inviteCleanupTimer = setInterval(() => {
+        cleanupExpiredInviteMessages().catch((error) =>
+          console.error("[INVITE CLEANUP TIMER ERROR]", error.message),
+        );
+      }, 15000);
+      inviteCleanupTimer.unref?.();
+    }
   } catch (error) {
     console.error("[BOT INIT ERROR]", error.message);
   }

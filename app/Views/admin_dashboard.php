@@ -22,6 +22,12 @@
         <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
+<?php if (session()->getFlashdata('error')): ?>
+    <div class="alert alert-danger alert-dismissible fade show rounded-4 px-4 py-3 mb-4 shadow-sm" role="alert">
+        <i class="bi bi-exclamation-circle-fill me-2"></i><?= esc(session()->getFlashdata('error')) ?>
+        <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+<?php endif; ?>
 
 <div class="row g-3 mb-5">
     <div class="col-xl-3 col-md-6 col-12">
@@ -200,6 +206,16 @@
                     <button class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold btn-sync-single" onclick="syncData(this, '<?= $m['id_hfm'] ?>')">
                         <i class="bi bi-arrow-repeat me-1"></i> Cek API
                     </button>
+
+                    <?php if (($m['status'] ?? '') === 'aktif' && preg_match('/^[1-9][0-9]{4,19}$/', (string) ($m['id_telegram'] ?? '')) === 1): ?>
+                        <form method="post" action="<?= base_url('AdminDashboard/resendTelegramInvite') ?>" class="d-inline" onsubmit="return confirm('Kirim invite Telegram sekali pakai kepada member ini?')">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="id_hfm" value="<?= esc($m['id_hfm']) ?>">
+                            <button type="submit" class="btn btn-outline-info btn-sm rounded-pill px-3 fw-semibold">
+                                <i class="bi bi-send me-1"></i> Kirim Ulang Invite
+                            </button>
+                        </form>
+                    <?php endif; ?>
 
                     <button class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-semibold btn-hapus"
                         data-id="<?= esc($m['id_hfm']) ?>" data-nama="<?= esc($m['nama'] ?? 'Member BOSSCUAN') ?>"

@@ -149,6 +149,39 @@ class AdminDashboard extends BaseController
         return view('admin_dashboard', $data);
     }
 
+    public function resendTelegramInvite()
+    {
+        if (!$this->request->is('post')) {
+            return redirect()->to(base_url('AdminDashboard'));
+        }
+
+        $idHfm = trim((string) $this->request->getPost('id_hfm'));
+        if (preg_match('/^\d{5,15}$/', $idHfm) !== 1) {
+            return redirect()->to(base_url('AdminDashboard'))
+                ->with('error', 'ID HFM tidak valid untuk pengiriman ulang invite.');
+        }
+
+        $db = \Config\Database::connect();
+        $member = $db->table('tb_member_vip')
+            ->where('id_hfm', $idHfm)
+            ->orderBy('id', 'DESC')
+            ->get(1)
+            ->getRowArray();
+
+        if (!$member || ($member['status'] ?? '') !== 'aktif') {
+            return redirect()->to(base_url('AdminDashboard'))
+                ->with('error', 'Invite hanya dapat dikirim kepada member dengan status IB aktif.');
+        }
+        if (preg_match('/^[1-9][0-9]{4,19}$/', trim((string) ($member['id_telegram'] ?? ''))) !== 1) {
+            return redirect()->to(base_url('AdminDashboard'))
+                ->with('error', 'ID Telegram belum tercatat dengan benar pada data member ini.');
+        }
+
+        $result = $this->postBotJson('/admin/resend-telegram-invite', ['id_hfm' => $idHfm]);
+        return redirect()->to(base_url('AdminDashboard'))
+            ->with($result['ok'] ? 'pesan' : 'error', $result['message']);
+    }
+
     // ==========================================
     // BACKUP DATABASE MYSQL
     // ==========================================

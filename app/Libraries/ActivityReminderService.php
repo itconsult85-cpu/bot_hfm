@@ -9,6 +9,8 @@ use DateTimeZone;
 class ActivityReminderService
 {
     private const HFM_BASE_URL = 'https://api.hfm-partners.com/api/clients/';
+    private const REPORT_GROUP_ID = '-5564212131';
+
     public function eligibleMembers(?string $phase = null): array
     {
         // Loop di bawah ini memanggil API HFM satu per satu untuk tiap member aktif,
@@ -147,6 +149,7 @@ class ActivityReminderService
             'phase_counts' => $phaseCounts,
         ];
         $this->sendAdminReport($token, $adminId, $result, $evaluationMembers);
+        $this->sendGroupReport($token, $result);
         return $result;
     }
 
@@ -354,6 +357,36 @@ class ActivityReminderService
     {
         $row = $db->table('bot_globals')->where('key_name', $key)->get()->getRowArray();
         return trim((string) ($row['key_value'] ?? ''));
+    }
+
+    private function sendGroupReport(string $token, array $result): void
+    {
+        if ($token === '' || ($result['due'] === 0 && $result['failed'] === 0)) {
+            return;
+        }
+
+        // Grup hanya menerima rekap angka; data member dan tautan tindakan
+        // tetap dikirim secara privat melalui sendAdminReport().
+        $lines = [
+            '📋 LAPORAN PENGINGAT AKTIVITAS MEMBER',
+            'Waktu: ' . date('d-m-Y H:i:s'),
+            'Jatuh tempo: ' . $result['due'],
+            'Berhasil dikirim: ' . $result['sent'],
+            'Sudah pernah dikirim: ' . $result['skipped'],
+            'Gagal: ' . $result['failed'],
+            '',
+            'REKAP FASE EVALUASI',
+            'H-3: ' . ($result['phase_counts']['h3'] ?? 0) . ' client',
+            'H-1: ' . ($result['phase_counts']['h1'] ?? 0) . ' client',
+            'Final: ' . ($result['phase_counts']['final'] ?? 0) . ' client',
+        ];
+
+        $response = $this->sendTelegram($token, self::REPORT_GROUP_ID, implode("\n", $lines));
+        if (!($response['ok'] ?? false)) {
+            log_message('error', 'Gagal mengirim rekap activity-reminders ke grup: {error}', [
+                'error' => $response['description'] ?? 'Telegram gagal',
+            ]);
+        }
     }
 
     private function sendAdminReport(string $token, string $adminId, array $result, array $evaluationMembers): void

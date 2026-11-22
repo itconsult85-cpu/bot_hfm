@@ -43,6 +43,7 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->post('admin/update-member', 'AdminDashboard::updateMember');
     $routes->post('admin/update-id-quick', 'AdminDashboard::updateIdQuick');
     $routes->post('admin/update-member-ajax', 'AdminDashboard::updateMemberAjax');
+    $routes->post('AdminDashboard/resendTelegramInvite', 'AdminDashboard::resendTelegramInvite');
 
     // ROUTE HAPUS MEMBER
     $routes->get('AdminDashboard/hapus-member/(:any)', 'AdminDashboard::hapusMember/$1');

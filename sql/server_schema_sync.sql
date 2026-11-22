@@ -85,6 +85,30 @@ CREATE TABLE IF NOT EXISTS `telegram_group_members` (
   KEY `idx_telegram_group_member_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Riwayat pengiriman tautan invite dan status penghapusan pesan.
+-- Tabel ini terpisah dari telegram_group_members; pengiriman invite bukan bukti sudah bergabung.
+CREATE TABLE IF NOT EXISTS `telegram_invite_logs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `id_hfm` VARCHAR(50) NOT NULL,
+  `telegram_id` VARCHAR(50) NOT NULL,
+  `group_id` VARCHAR(100) NOT NULL,
+  `invite_source` VARCHAR(30) NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+  `message_id` BIGINT UNSIGNED DEFAULT NULL,
+  `sent_at` DATETIME DEFAULT NULL,
+  `expires_at` DATETIME DEFAULT NULL,
+  `delete_status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+  `deleted_at` DATETIME DEFAULT NULL,
+  `delete_attempts` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `error_message` VARCHAR(500) DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_telegram_invite_user_time` (`telegram_id`, `sent_at`),
+  KEY `idx_telegram_invite_cleanup` (`delete_status`, `expires_at`),
+  KEY `idx_telegram_invite_hfm` (`id_hfm`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- Tabel metadata migrasi CI4. Dibuat kosong; riwayat migration localhost tidak disalin.
 CREATE TABLE IF NOT EXISTS `migrations` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -104,4 +128,5 @@ SHOW TABLES LIKE 'bot_group_links';
 SHOW TABLES LIKE 'bot_schedules';
 SHOW TABLES LIKE 'whatsapp_group_members';
 SHOW TABLES LIKE 'telegram_group_members';
+SHOW TABLES LIKE 'telegram_invite_logs';
 SHOW TABLES LIKE 'migrations';
