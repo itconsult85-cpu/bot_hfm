@@ -672,6 +672,7 @@ class Client extends BaseController
         } else {
             return $this->response->setJSON([
                 'status' => 'kurang_deposit',
+                'nama_api' => trim((string) ($data['name'] ?? '')) ?: null,
                 'pesan'  => "Saldo/Deposit Kakak saat ini $deposit $currency.\nUntuk bisa bergabung di Grup VIP silakan isi saldo minimal {$min} (setara Rp100.000)."
             ]);
         }
