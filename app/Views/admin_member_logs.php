@@ -137,21 +137,18 @@
     </form>
 </div>
 
-<div class="table-container shadow-sm bg-white rounded-4 border border-light overflow-hidden mb-4">
+<div class="table-container dashboard-member-table-wrap shadow-sm bg-white rounded-4 border border-light overflow-hidden mb-4">
     <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle table-sm d-md-table">
+        <table id="memberLogsDataTable" class="table table-hover mb-0 align-middle table-sm d-md-table dashboard-member-table member-logs-data-table">
             <thead class="table-light">
                 <tr>
-                    <th style="width: 40px;" class="text-center border-bottom-0 px-1 px-md-3">#</th>
-                    <th class="border-bottom-0">Nama</th>
-                    <th class="border-bottom-0 d-none d-md-table-cell">Kontak (WA & Tele)</th>
-                    <th class="border-bottom-0 d-none d-md-table-cell">ID Trading</th>
+                    <th class="text-center border-bottom-0">Identitas Member</th>
                     <th class="border-bottom-0 text-nowrap">Tipe Aktivitas</th>
-                    <th class="border-bottom-0 d-none d-md-table-cell">Status</th>
-                    <th class="border-bottom-0 d-none d-md-table-cell text-nowrap">Waktu Bergabung</th>
-                    <th class="border-bottom-0 d-none d-md-table-cell text-nowrap">Waktu Lepas IB</th>
-                    <th class="border-bottom-0 d-none d-md-table-cell text-nowrap">Waktu Aktivitas</th>
-                    <th style="width: 100px;" class="text-center border-bottom-0 px-1 px-md-3">Aksi</th>
+                    <th class="border-bottom-0 text-center">Status IB</th>
+                    <th class="border-bottom-0 text-center text-nowrap">Waktu Bergabung</th>
+                    <th class="border-bottom-0 text-center text-nowrap">Waktu Lepas IB</th>
+                    <th class="border-bottom-0 text-center text-nowrap">Waktu Aktivitas</th>
+                    <th class="text-center border-bottom-0">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -352,7 +349,7 @@
     </div>
 
     <?php $logsFrom = $totalData > 0 ? (($currentPage - 1) * $perPage + 1) : 0; $logsTo = min($currentPage * $perPage, $totalData); ?>
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 mt-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 mt-4 legacy-member-logs-pagination">
         <span class="text-muted small">
             <?php if ($totalData > 0): ?>Menampilkan <b><?= $logsFrom ?></b> hingga <b><?= $logsTo ?></b> dari <b><?= number_format($totalData) ?></b> data<?php else: ?>Menampilkan 0 data<?php endif; ?>
         </span>
@@ -602,6 +599,63 @@
 
             const linkHapus = document.getElementById('linkHapusLogModal');
             if (linkHapus) linkHapus.href = "<?= base_url('AdminDashboard/hapusLog/') ?>" + id;
+        });
+    });
+
+    $(function() {
+        const esc = value => $('<div>').text(value ?? '').html();
+        const dateCell = value => {
+            if (!value) return '<span class="text-muted">-</span>';
+            const date = new Date(String(value).replace(' ', 'T'));
+            if (Number.isNaN(date.getTime())) return esc(value);
+            return `<span class="small text-muted" title="${esc(value)}"><i class="bi bi-calendar3 me-1"></i>${date.toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'})}<br><i class="bi bi-clock me-1"></i>${date.toLocaleTimeString('id-ID')} WIB</span>`;
+        };
+        const activityCell = value => {
+            const type = String(value || '');
+            const labels = {keluar_sendiri: 'Keluar sendiri', keluar_di_remove: 'Di-kick admin', dihapus_admin_web: 'Di-kick admin', kick_massal_lepas_ib: 'Kick massal Lepas IB', keluar_grup: 'Keluar grup'};
+            const icons = {masuk: 'bi-box-arrow-in-right', masuk_id_baru: 'bi-box-arrow-in-right', masuk_via_form: 'bi-box-arrow-in-right', aktif_kembali: 'bi-check-circle-fill', lepas_ib: 'bi-exclamation-triangle', keluar_sendiri: 'bi-box-arrow-right', keluar_di_remove: 'bi-x-circle', dihapus_admin_web: 'bi-x-circle', kick_massal_lepas_ib: 'bi-x-circle'};
+            const classes = ['masuk', 'masuk_id_baru', 'masuk_via_form', 'aktif_kembali'].includes(type) ? 'bg-success text-white' : type === 'lepas_ib' ? 'bg-warning text-dark' : ['keluar_sendiri', 'keluar_di_remove', 'dihapus_admin_web', 'kick_massal_lepas_ib'].includes(type) ? 'bg-danger text-white' : 'bg-secondary text-white';
+            return `<span class="badge ${classes}"><i class="bi ${icons[type] || 'bi-circle'} me-1"></i>${esc(labels[type] || type.replaceAll('_', ' '))}</span>`;
+        };
+        const statusCell = value => value === 'aktif' ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Aktif</span>' : value === 'lepas_ib' ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">Lepas IB</span>' : value === 'keluar_grup' ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Keluar Grup</span>' : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">Tidak Terdaftar</span>';
+        $('#memberLogsDataTable tbody').empty();
+        const table = $('#memberLogsDataTable').DataTable({
+            processing: true,
+            serverSide: true,
+            autoWidth: false,
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            order: [[5, 'desc']],
+            dom: '<"row mb-3 align-items-center"<"col-md-6"l><"col-md-6 text-md-end">>rt<"row mt-3 align-items-center"<"col-md-6"i><"col-md-6"p>>',
+            language: {url: "<?= base_url('assets/vendor/datatables/i18n/id.json') ?>"},
+            ajax: {
+                url: "<?= base_url('AdminDashboard/memberLogsDataTables') ?>",
+                data: function(d) {
+                    d.tipe = $('select[name="tipe"]').val() || '';
+                    d.status = $('select[name="status"]').val() || '';
+                    d.date_from = $('input[name="date_from"]').val() || '';
+                    d.date_to = $('input[name="date_to"]').val() || '';
+                }
+            },
+            columns: [
+                {data: null, className: 'text-center', render: row => `<div class="member-identity-stack log-identity-stack"><div class="member-identity-name">${esc(row.nama || 'Member')}</div><div><span class="member-identity-label">ID HFM</span><span class="member-identity-value">${esc(row.id_hfm || '-')}</span></div><div><span class="member-identity-label">WHATSAPP</span><span class="member-identity-value">${esc(row.no_wa || '-')}</span></div><div><span class="member-identity-label">TELEGRAM</span><span class="member-identity-value">${esc(row.id_telegram || '-')}</span></div><div><span class="member-identity-label">EMAIL</span><span class="member-identity-value">${esc(row.email || '-')}</span></div></div>`},
+                {data: 'tipe_aktivitas', render: activityCell},
+                {data: 'status_member', className: 'text-center text-nowrap', render: statusCell},
+                {data: 'waktu_bergabung', className: 'text-center text-nowrap', render: dateCell},
+                {data: 'waktu_lepas_ib', className: 'text-center text-nowrap', render: dateCell},
+                {data: 'created_at', className: 'text-center text-nowrap', render: dateCell},
+                {data: null, orderable: false, searchable: false, className: 'text-center', render: row => `<div class="member-table-actions"><button class="btn btn-outline-warning btn-sm" onclick="editIdLog('${esc(row.id_hfm || '')}')" title="Edit ID Trading"><i class="bi bi-pencil-square"></i></button><button class="btn btn-outline-primary btn-sm" data-wa="${esc(row.no_wa || '-') }" data-telegram="${esc(row.id_telegram || '-') }" data-nama="${esc(row.nama || '-') }" data-tipe="${esc(row.tipe_aktivitas || '-') }" data-waktu="${esc(row.created_at || '')}" data-id-trading="${esc(row.id_hfm || '-') }" data-waktu-bergabung="${esc(row.waktu_bergabung || '')}" data-waktu-lepas-ib="${esc(row.waktu_lepas_ib || '')}" onclick="showDetailFromButton(this)" title="Lihat detail"><i class="bi bi-eye"></i></button><button type="button" class="btn btn-outline-danger btn-sm btn-hapus-log" data-id="${esc(row.id || '')}" data-nama="${esc(row.nama || '-') }" data-bs-toggle="modal" data-bs-target="#modalHapusLog" title="Hapus"><i class="bi bi-trash"></i></button></div>`}
+            ],
+            createdRow: function(row) {
+                const labels = ['Identitas Member', 'Tipe Aktivitas', 'Status IB', 'Waktu Bergabung', 'Waktu Lepas IB', 'Waktu Aktivitas', 'Aksi'];
+                $(row).addClass('member-item').children('td').each(function(index) { $(this).attr('data-label', labels[index] || ''); });
+            }
+        });
+        $('input[name="search"]').on('input', function() { table.search(this.value).draw(); });
+        $('select[name="tipe"], select[name="status"], input[name="date_from"], input[name="date_to"]').on('change', () => table.ajax.reload());
+        $('#memberLogsDataTable tbody').on('click', '.btn-hapus-log', function() {
+            document.getElementById('teksNamaHapusLog').innerText = this.dataset.nama || '';
+            document.getElementById('linkHapusLogModal').href = "<?= base_url('AdminDashboard/hapusLog/') ?>" + (this.dataset.id || '');
         });
     });
 </script>

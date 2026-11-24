@@ -141,12 +141,117 @@ class AdminDashboard extends BaseController
         // Status pasif harus memakai last_trade terbaru dari API HFM, bukan nilai cache lokal.
         $data['pasif_total'] = count((new ActivityReminderService())->inactiveMembersFromApi(30));
 
-        $data['members'] = $db->table('tb_member_vip')
-            ->orderBy('created_at', 'DESC')
-            ->get()
-            ->getResultArray();
-
         return view('admin_dashboard', $data);
+    }
+
+    /** Endpoint DataTables server-side untuk daftar member dashboard. */
+    public function membersDataTables()
+    {
+        $request = $this->request;
+        $db = \Config\Database::connect();
+        $hasWithdrawals = $db->fieldExists('withdrawals', 'tb_member_vip');
+        $columns = [0 => 'nama', 1 => 'deposit', 2 => $hasWithdrawals ? 'withdrawals' : 'id', 3 => 'last_trade', 4 => 'status', 5 => 'currency', 6 => 'campaign', 7 => 'id'];
+        $total = $db->table('tb_member_vip')->countAllResults();
+        $searchParams = $request->getGet('search') ?? [];
+        $search = trim((string) ($searchParams['value'] ?? ''));
+        $status = trim((string) ($request->getGet('status') ?? ''));
+        $currency = trim((string) ($request->getGet('currency') ?? ''));
+        $applyFilters = static function ($builder) use ($search, $status, $currency): void {
+            if ($search !== '') {
+                $builder->groupStart()->like('nama', $search)->orLike('id_hfm', $search)->orLike('no_wa', $search)->orLike('id_telegram', $search)->orLike('email', $search)->orLike('campaign', $search)->orLike('status', $search)->orLike('currency', $search)->groupEnd();
+            }
+            if (in_array($status, ['aktif', 'lepas_ib'], true)) $builder->where('status', $status);
+            if (in_array($currency, ['USD', 'USC', 'IDR'], true)) $builder->where('currency', $currency);
+        };
+        $filteredBuilder = $db->table('tb_member_vip');
+        $applyFilters($filteredBuilder);
+        $filtered = $filteredBuilder->countAllResults();
+        $order = $request->getGet('order') ?? [];
+        $orderIndex = (int) ($order[0]['column'] ?? 0);
+        $orderDir = strtolower((string) ($order[0]['dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
+        $orderColumn = $columns[$orderIndex] ?? 'created_at';
+        $dataBuilder = $db->table('tb_member_vip')->select('id, id_hfm, no_wa, nama, email, id_telegram, deposit, currency, status, last_trade, campaign, created_at');
+        if ($hasWithdrawals) $dataBuilder->select('withdrawals', false);
+        $applyFilters($dataBuilder);
+        $startRow = max(0, (int) ($request->getGet('start') ?? 0));
+        $length = (int) ($request->getGet('length') ?? 25);
+        $length = $length < 1 ? 25 : min($length, 100);
+        $rows = $dataBuilder->orderBy($orderColumn, $orderDir)->limit($length, $startRow)->get()->getResultArray();
+        return $this->response->setJSON(['draw' => (int) ($request->getGet('draw') ?? 0), 'recordsTotal' => (int) $total, 'recordsFiltered' => (int) $filtered, 'data' => $rows]);
+    }
+
+    /** Endpoint DataTables server-side untuk riwayat log member. */
+    public function memberLogsDataTables()
+    {
+        $request = $this->request;
+        $db = \Config\Database::connect();
+        $hasLogTelegram = $this->hasMemberLogTelegramColumn($db);
+        $logTelegramSelect = $hasLogTelegram
+            ? "COALESCE(NULLIF(NULLIF(tb_member_logs.id_telegram, ''), '-'), NULLIF(NULLIF(tb_member_vip.id_telegram, ''), '-'))"
+            : 'tb_member_vip.id_telegram';
+        $statusFromLog = "CASE WHEN tb_member_logs.tipe_aktivitas IN ('lepas_ib', 'kick_massal_lepas_ib') THEN 'lepas_ib' ELSE NULL END";
+        $joinActivityTypes = "'masuk', 'masuk_id_baru', 'masuk_via_form', 'aktif_kembali'";
+        $joinedAtSelect = "(SELECT MAX(previous_log.created_at) FROM tb_member_logs AS previous_log
+            WHERE previous_log.id_hfm = tb_member_logs.id_hfm
+              AND previous_log.tipe_aktivitas IN ({$joinActivityTypes})
+              AND (previous_log.created_at < tb_member_logs.created_at
+                   OR (previous_log.created_at = tb_member_logs.created_at AND previous_log.id < tb_member_logs.id)))";
+        $leftAtSelect = "CASE WHEN tb_member_logs.tipe_aktivitas IN ('lepas_ib', 'kick_massal_lepas_ib') THEN tb_member_logs.created_at ELSE NULL END";
+        $applyFilters = static function ($builder) use ($request): void {
+            $searchParams = $request->getGet('search') ?? [];
+            $search = trim((string) ($searchParams['value'] ?? ''));
+            if ($search !== '') {
+                $builder->groupStart()
+                    ->like('tb_member_logs.nama', $search)
+                    ->orLike('tb_member_logs.no_wa', $search)
+                    ->orLike('tb_member_logs.id_hfm', $search)
+                    ->orLike('tb_member_logs.id_telegram', $search)
+                    ->orLike('tb_member_vip.id_telegram', $search)
+                    ->orLike('tb_member_vip.email', $search)
+                    ->orLike('tb_member_logs.tipe_aktivitas', $search)
+                    ->groupEnd();
+            }
+            $tipe = trim((string) ($request->getGet('tipe') ?? ''));
+            if ($tipe !== '') $builder->where('tb_member_logs.tipe_aktivitas', $tipe);
+            $status = trim((string) ($request->getGet('status') ?? ''));
+            if ($status === 'lepas_ib') {
+                $builder->groupStart()->where('tb_member_vip.status', 'lepas_ib')
+                    ->orGroupStart()->where('tb_member_vip.id IS NULL', null, false)
+                    ->where('tb_member_logs.tipe_aktivitas', 'lepas_ib')->groupEnd()->groupEnd();
+            } elseif (in_array($status, ['aktif', 'keluar_grup'], true)) {
+                $builder->where('tb_member_vip.status', $status);
+            }
+            $dateFrom = trim((string) ($request->getGet('date_from') ?? ''));
+            $dateTo = trim((string) ($request->getGet('date_to') ?? ''));
+            if ($dateFrom !== '') $builder->where('tb_member_logs.created_at >=', $dateFrom . ' 00:00:00');
+            if ($dateTo !== '') $builder->where('tb_member_logs.created_at <=', $dateTo . ' 23:59:59');
+        };
+        $base = static function () use ($db, $logTelegramSelect, $statusFromLog, $joinedAtSelect, $leftAtSelect) {
+            return $db->table('tb_member_logs')
+                ->select("tb_member_logs.*, tb_member_vip.email, COALESCE(tb_member_vip.status, {$statusFromLog}) as status_member,
+                    {$logTelegramSelect} as id_telegram, {$joinedAtSelect} as waktu_bergabung, {$leftAtSelect} as waktu_lepas_ib")
+                ->join('tb_member_vip', 'tb_member_vip.id_hfm = tb_member_logs.id_hfm', 'left');
+        };
+        $total = $base()->countAllResults();
+        $filteredBuilder = $base();
+        $applyFilters($filteredBuilder);
+        $filtered = $filteredBuilder->countAllResults();
+        $orderColumns = [0 => 'tb_member_logs.nama', 1 => 'tb_member_logs.tipe_aktivitas', 2 => 'status_member', 3 => 'tb_member_logs.created_at', 4 => 'tb_member_logs.created_at', 5 => 'tb_member_logs.created_at', 6 => 'tb_member_logs.id'];
+        $order = $request->getGet('order') ?? [];
+        $orderIndex = (int) ($order[0]['column'] ?? 5);
+        $orderDir = strtolower((string) ($order[0]['dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
+        $orderColumn = $orderColumns[$orderIndex] ?? 'tb_member_logs.created_at';
+        $length = min(max((int) ($request->getGet('length') ?? 25), 1), 100);
+        $start = max((int) ($request->getGet('start') ?? 0), 0);
+        $dataBuilder = $base();
+        $applyFilters($dataBuilder);
+        $rows = $dataBuilder->orderBy($orderColumn, $orderDir)->orderBy('tb_member_logs.id', 'DESC')->limit($length, $start)->get()->getResultArray();
+        return $this->response->setJSON([
+            'draw' => (int) ($request->getGet('draw') ?? 0),
+            'recordsTotal' => (int) $total,
+            'recordsFiltered' => (int) $filtered,
+            'data' => $rows,
+        ]);
     }
 
     public function resendTelegramInvite()
@@ -1345,6 +1450,9 @@ class AdminDashboard extends BaseController
                 $bal    = (float)($dataApi['balance'] ?? 0);
                 $equity = (float)($dataApi['equity'] ?? 0);
                 $deposit_real = max($depo, $bal, $equity);
+                $withdrawals_real = array_key_exists('withdrawals', $dataApi) && is_numeric($dataApi['withdrawals'])
+                    ? (float) $dataApi['withdrawals']
+                    : null;
 
                 // Bersihkan string Last Trade dari milidetik
                 $last_trade_real = null;
@@ -1367,6 +1475,9 @@ class AdminDashboard extends BaseController
                 if (array_key_exists('campaign', $dataApi)) {
                     $campaign = trim((string) ($dataApi['campaign'] ?? ''));
                     $updateData['campaign'] = $campaign !== '' ? $campaign : null;
+                }
+                if ($db->fieldExists('withdrawals', 'tb_member_vip')) {
+                    $updateData['withdrawals'] = $withdrawals_real;
                 }
 
                 // PENCATATAN LOG: Jika status berubah jadi aktif

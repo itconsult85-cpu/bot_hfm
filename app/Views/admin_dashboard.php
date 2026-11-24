@@ -81,7 +81,7 @@
         <h4 class="fw-bold tracking-tight mb-1">Database Klien VIP</h4>
         <p class="text-muted small mb-0">Kelola dan sinkronkan data member secara realtime.</p>
     </div>
-    <div class="d-flex flex-column flex-md-row gap-2">
+    <div class="d-flex flex-column flex-md-row gap-2 member-filter-controls">
         <select id="filterStatus" class="form-select rounded-pill px-3" style="min-width: 140px;">
             <option value="">Semua Status</option>
             <option value="aktif">Aktif</option>
@@ -93,149 +93,30 @@
             <option value="USC">USC</option>
             <option value="IDR">IDR</option>
         </select>
-        <input type="text" id="searchInput" class="form-control rounded-pill px-4" placeholder="Cari Nama, ID, WA, Tele, email, campaign..." style="min-width: 250px;">
+        <input type="text" id="searchInput" class="form-control rounded-pill px-3" placeholder="Cari Nama, ID, WA, Tele, email, campaign...">
         <button class="btn btn-primary rounded-pill px-4 fw-semibold shadow-sm text-nowrap" onclick="syncSemua()" id="btnSyncSemua">
             <i class="bi bi-cloud-arrow-down-fill me-2"></i> Sync Semua
         </button>
     </div>
 </div>
 
-<div class="row g-3" id="memberContainer">
-    <?php $no = 1; ?>
-    <?php foreach ($members as $m): ?>
-        <div class="col-12 member-item"
-            data-nama="<?= strtolower(esc($m['nama'] ?? '')) ?>"
-            data-idhfm="<?= esc($m['id_hfm']) ?>"
-            data-nowa="<?= esc($m['no_wa']) ?>"
-            data-idtelegram="<?= strtolower(esc($m['id_telegram'] ?? '')) ?>"
-            data-email="<?= esc(strtolower((string) ($m['email'] ?? ''))) ?>"
-            data-campaign="<?= esc(strtolower((string) ($m['campaign'] ?? ''))) ?>"
-            data-status="<?= esc($m['status']) ?>"
-            data-currency="<?= esc($m['currency'] ?? 'USD') ?>">
-            <div class="card data-card p-3">
-                <div class="member-data-grid">
-
-                    <div class="member-data-identity d-flex align-items-start align-items-md-center">
-
-                        <div class="fw-bold text-muted text-end me-2 me-md-3 mt-1 mt-md-0">
-                            <?= $no++ ?>.
-                        </div>
-
-                        <div class="me-3">
-                            <?php
-                            $nama_member = trim($m['nama'] ?? '');
-                            if (empty($nama_member) || $nama_member == 'Member BOSSCUAN') {
-                                $inisial = 'MB';
-                            } else {
-                                $pecah = explode(' ', $nama_member);
-                                if (count($pecah) > 1) {
-                                    $inisial = strtoupper(substr($pecah[0], 0, 1) . substr($pecah[1], 0, 1));
-                                } else {
-                                    $inisial = strtoupper(substr($nama_member, 0, 2));
-                                }
-                            }
-                            ?>
-                            <div class="avatar-sub"><?= $inisial ?></div>
-                        </div>
-
-                        <div class="flex-grow-1">
-                            <h6 class="fw-bold mb-0 text-dark" id="nama-<?= $m['id_hfm'] ?>">
-                                <?= isset($m['nama']) && !empty($m['nama']) ? esc($m['nama']) : 'Member BOSSCUAN' ?>
-                            </h6>
-                            <div class="text-muted small mt-1 d-flex flex-column gap-1">
-                                <div><i class="bi bi-hash text-primary"></i> <?= esc($m['id_hfm']) ?></div>
-                                <div><i class="bi bi-whatsapp text-success"></i> <?= esc($m['no_wa']) ?></div>
-                                <div><i class="bi bi-telegram text-info"></i> <?= esc($m['id_telegram'] ?? '-') ?></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="member-data-field member-data-email">
-                        <p class="text-muted small mb-0">Email</p>
-                        <span class="small text-break" id="email-<?= esc($m['id_hfm']) ?>"><?= esc(($m['email'] ?? '') ?: '-') ?></span>
-                    </div>
-
-                    <div class="member-data-field member-data-deposit">
-                        <p class="text-muted small mb-0">Deposit</p>
-                        <span class="fw-bold text-dark" id="depo-<?= $m['id_hfm'] ?>">
-                            <?= esc($m['currency'] ?? 'USD') ?> <?= number_format($m['deposit'], 2) ?>
-                        </span>
-                    </div>
-
-                    <div class="member-data-field member-data-trade">
-                        <p class="text-muted small mb-0">Terakhir Trading</p>
-                        <span id="trade-<?= $m['id_hfm'] ?>" class="d-inline-block mt-1">
-                            <?php if (empty($m['last_trade']) || $m['last_trade'] === '0000-00-00 00:00:00'): ?>
-                                <span class="badge bg-light border text-muted rounded-pill small">Belum Trading</span>
-                            <?php else: ?>
-                                <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill fw-semibold small">
-                                    <i class="bi bi-graph-up me-1"></i><?= date('d M Y', strtotime($m['last_trade'])) ?>
-                                </span>
-                            <?php endif; ?>
-                        </span>
-                    </div>
-
-                    <div class="member-data-field member-data-status">
-                        <p class="text-muted small mb-0">Status IB</p>
-                        <span id="status-<?= $m['id_hfm'] ?>" class="d-inline-block mt-1">
-                            <?php if ($m['status'] == 'aktif'): ?>
-                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2 small fw-semibold">Aktif</span>
-                            <?php else: ?>
-                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-2 small fw-semibold">Lepas IB</span>
-                            <?php endif; ?>
-                        </span>
-                    </div>
-
-                    <div class="member-data-field member-data-campaign">
-                        <p class="text-muted small mb-0">Campaign</p>
-                        <span class="small text-break" id="campaign-<?= esc($m['id_hfm']) ?>"><?= esc(($m['campaign'] ?? '') ?: '-') ?></span>
-                    </div>
-                </div>
-
-                <div class="member-data-actions">
-                    <button class="btn btn-outline-warning btn-sm rounded-pill px-3 fw-semibold btn-edit"
-                            data-id="<?= esc($m['id_hfm']) ?>"
-                            data-wa="<?= esc($m['no_wa']) ?>"
-                            data-currency="<?= esc($m['currency'] ?? 'USD') ?>"
-                            data-deposit="<?= esc($m['deposit']) ?>"
-                            data-status="<?= esc($m['status']) ?>"
-                            data-trade="<?= esc($m['last_trade']) ?>">
-                            <i class="bi bi-pencil-square me-1"></i> Edit
-                    </button>
-
-                    <button class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold btn-sync-single" onclick="syncData(this, '<?= $m['id_hfm'] ?>')">
-                        <i class="bi bi-arrow-repeat me-1"></i> Cek API
-                    </button>
-
-                    <?php if (($m['status'] ?? '') === 'aktif' && preg_match('/^[1-9][0-9]{4,19}$/', (string) ($m['id_telegram'] ?? '')) === 1): ?>
-                        <form method="post" action="<?= base_url('AdminDashboard/resendTelegramInvite') ?>" class="d-inline" onsubmit="return confirm('Kirim invite Telegram sekali pakai kepada member ini?')">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="id_hfm" value="<?= esc($m['id_hfm']) ?>">
-                            <button type="submit" class="btn btn-outline-info btn-sm rounded-pill px-3 fw-semibold">
-                                <i class="bi bi-send me-1"></i> Kirim Ulang Invite
-                            </button>
-                        </form>
-                    <?php endif; ?>
-
-                    <button class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-semibold btn-hapus"
-                        data-id="<?= esc($m['id_hfm']) ?>" data-nama="<?= esc($m['nama'] ?? 'Member BOSSCUAN') ?>"
-                        data-bs-toggle="modal" data-bs-target="#modalHapus">
-                        <i class="bi bi-trash3 me-1"></i> Hapus
-                    </button>
-                </div>
-            </div>
-        </div>
-    <?php endforeach; ?>
-</div>
-
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4">
-    <span class="text-muted small mb-2 mb-md-0" id="pageInfo">Menampilkan 0 data</span>
-    <nav aria-label="Navigasi halaman data member">
-        <ul class="pagination pagination-sm mb-0 flex-wrap" id="paginationControls"></ul>
-    </nav>
-</div>
-
-<div class="modal fade" id="modalEdit" tabindex="-1" aria-hidden="true">
+<div class="table-responsive rounded-4 border bg-white shadow-sm dashboard-member-table-wrap">
+    <table id="membersDataTable" class="table table-hover align-middle mb-0 w-100 dashboard-member-table">
+        <thead>
+            <tr>
+                <th class="text-center">Identitas Member</th>
+                <th class="text-end">Deposit</th>
+                <th class="text-end">Withdrawals</th>
+                <th class="text-center">Terakhir Trading</th>
+                <th class="text-center">Status IB</th>
+                <th class="text-center">Akun</th>
+                <th>Campaign</th>
+                <th class="text-center">Aksi</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div><div class="modal fade" id="modalEdit" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg">
             <div class="modal-header border-0 pb-0">
@@ -337,34 +218,30 @@
 <?= $this->section('scripts') ?>
 <script src="<?= base_url('assets/vendor/qrcode/qrcode.min.js') ?>"></script>
 <script>
-    document.querySelectorAll('.btn-hapus').forEach(btn => {
-        btn.addEventListener('click', function(e) {
+    document.addEventListener('click', function(e) {
+        const deleteButton = e.target.closest('.btn-hapus');
+        if (deleteButton) {
             e.preventDefault();
-            const id = this.getAttribute('data-id');
-            const nama = this.getAttribute('data-nama') || 'Member BOSSCUAN';
-            document.getElementById('teksIdHapus').innerText = id;
-            document.getElementById('teksNamaHapus').innerText = nama;
-            const linkHapus = document.getElementById('linkHapusModal');
-            if (linkHapus) linkHapus.href = "<?= base_url('AdminDashboard/hapus-member/') ?>" + id;
-        });
-    });
-
-    document.querySelectorAll('.btn-edit').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.getElementById('edit_id').value = this.getAttribute('data-id');
-            document.getElementById('edit_old_id').value = this.getAttribute('data-id');
-            document.getElementById('edit_wa').value = this.getAttribute('data-wa');
-            document.getElementById('edit_currency').value = this.getAttribute('data-currency');
-            document.getElementById('edit_deposit').value = this.getAttribute('data-deposit');
-            document.getElementById('edit_status').value = this.getAttribute('data-status');
-            document.getElementById('edit_trade').value = this.getAttribute('data-trade');
+            document.getElementById('teksIdHapus').innerText = deleteButton.dataset.id || '';
+            document.getElementById('teksNamaHapus').innerText = deleteButton.dataset.nama || 'Member BOSSCUAN';
+            document.getElementById('linkHapusModal').href = "<?= base_url('AdminDashboard/hapus-member/') ?>" + (deleteButton.dataset.id || '');
+        }
+        const editButton = e.target.closest('.btn-edit');
+        if (editButton) {
+            document.getElementById('edit_id').value = editButton.dataset.id || '';
+            document.getElementById('edit_old_id').value = editButton.dataset.id || '';
+            document.getElementById('edit_wa').value = editButton.dataset.wa || '';
+            document.getElementById('edit_currency').value = editButton.dataset.currency || 'USD';
+            document.getElementById('edit_deposit').value = editButton.dataset.deposit || '';
+            document.getElementById('edit_status').value = editButton.dataset.status || 'aktif';
+            document.getElementById('edit_trade').value = editButton.dataset.trade || '';
             new bootstrap.Modal(document.getElementById('modalEdit')).show();
-        });
+        }
     });
-
     async function syncData(btn, id_hfm, isBulk = false) {
+        let syncSucceeded = false;
         try {
-            btn.innerHTML = '<i class="bi bi-hourglass-split spinner-border spinner-border-sm me-1"></i> Loading...';
+            btn.innerHTML = '<i class="bi bi-arrow-repeat sync-icon-spin" aria-hidden="true"></i>';
             btn.disabled = true;
             btn.classList.replace('btn-outline-primary', 'btn-light');
 
@@ -386,12 +263,24 @@
             }
 
             if (res.status === 'sukses') {
+                syncSucceeded = true;
                 let currency = (res.data.currency && res.data.currency !== '') ? res.data.currency : 'USD';
                 let depoVal = parseFloat(res.data.deposit);
                 let depoFormatted = currency === 'IDR' ? currency + ' ' + depoVal.toLocaleString('id-ID') : currency + ' ' + depoVal.toFixed(2);
 
                 let depoEl = document.getElementById('depo-' + id_hfm);
                 if (depoEl) depoEl.innerText = depoFormatted;
+
+                if (Object.prototype.hasOwnProperty.call(res.data, 'withdrawals')) {
+                    const withdrawalsEl = document.getElementById('withdrawals-' + id_hfm);
+                    if (withdrawalsEl) {
+                        const withdrawalsRaw = res.data.withdrawals;
+                        const withdrawalsValue = Number(withdrawalsRaw);
+                        withdrawalsEl.innerText = withdrawalsRaw !== null && withdrawalsRaw !== '' && Number.isFinite(withdrawalsValue)
+                            ? currency + ' ' + withdrawalsValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : 'Belum tersinkron';
+                    }
+                }
 
                 if (res.data.nama) {
                     let elemNama = document.getElementById('nama-' + id_hfm);
@@ -433,6 +322,7 @@
                 }
 
             } else if (res.status === 'lepas_ib') {
+                syncSucceeded = true;
                 const row = document.querySelector(`.member-item[data-idhfm="${id_hfm}"]`);
                 const statusEl = document.getElementById('status-' + id_hfm);
                 if (statusEl) statusEl.innerHTML = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-2 small fw-semibold">Lepas IB</span>';
@@ -449,12 +339,13 @@
         } catch (err) {
             console.error('Terjadi Error di JS:', err);
         } finally {
-            btn.innerHTML = '<i class="bi bi-check-circle-fill text-success me-1"></i> Selesai';
-            setTimeout(() => {
-                btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Cek API';
-                btn.disabled = false;
-                btn.classList.replace('btn-light', 'btn-outline-primary');
-            }, 2000);
+            btn.disabled = false;
+            btn.classList.remove('btn-light', 'btn-outline-primary', 'btn-outline-success');
+            btn.classList.add('btn-outline-success');
+            btn.innerHTML = syncSucceeded
+                ? '<i class="bi bi-check-lg" aria-hidden="true"></i>'
+                : '<i class="bi bi-arrow-repeat" aria-hidden="true"></i>';
+            btn.title = syncSucceeded ? 'Sinkronisasi berhasil' : 'Coba sinkronisasi lagi';
         }
     }
 
@@ -470,7 +361,7 @@
             return;
         }
 
-        btnSemua.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Menyinkronkan...';
+        btnSemua.innerHTML = '<i class="bi bi-arrow-repeat sync-icon-spin" aria-hidden="true"></i>';
         btnSemua.disabled = true;
 
         for (let i = 0; i < itemsToSync.length; i++) {
@@ -485,9 +376,7 @@
             }
         }
 
-        if (typeof window.applyFilters === 'function') window.applyFilters();
-
-        btnSemua.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i> Sinkronisasi Selesai';
+        btnSemua.innerHTML = '<i class="bi bi-check-lg" aria-hidden="true"></i>';
         btnSemua.classList.replace('btn-primary', 'btn-success');
 
         setTimeout(() => {
@@ -498,153 +387,59 @@
     }
 
     document.addEventListener("DOMContentLoaded", function() {
-        const itemsPerPage = 100;
-        let currentPage = 1;
-        let allItems = Array.from(document.querySelectorAll('.member-item'));
-        let filteredItems = [...allItems];
-        window.getFilteredItems = () => filteredItems;
-        const paginationControls = document.getElementById('paginationControls');
-        const pageInfo = document.getElementById('pageInfo');
-
-        function renderPage(page) {
-            currentPage = page;
-            const start = (page - 1) * itemsPerPage;
-            const end = start + itemsPerPage;
-            allItems.forEach(item => item.classList.add('d-none'));
-            const paginatedItems = filteredItems.slice(start, end);
-            paginatedItems.forEach(item => item.classList.remove('d-none'));
-            updatePaginationInfo();
-            renderPaginationControls();
-        }
-
-        function updatePaginationInfo() {
-            const total = filteredItems.length;
-            if (total === 0) {
-                pageInfo.innerHTML = "Tidak ada data ditemukan.";
-                return;
-            }
-            const start = ((currentPage - 1) * itemsPerPage) + 1;
-            const end = Math.min(currentPage * itemsPerPage, total);
-            pageInfo.innerHTML = `Menampilkan <b>${start}</b> hingga <b>${end}</b> dari <b>${total}</b> data`;
-        }
-
-        function renderPaginationControls() {
-            paginationControls.innerHTML = '';
-            const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
-            if (totalPages <= 1) return;
-
-            const prevLi = document.createElement('li');
-            prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-            prevLi.innerHTML = currentPage === 1 ?
-                `<span class="page-link shadow-sm rounded-start-pill" aria-hidden="true">&laquo;</span>` :
-                `<a class="page-link shadow-sm rounded-start-pill" href="#" aria-label="Halaman sebelumnya">&laquo;</a>`;
-            prevLi.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (currentPage > 1) renderPage(currentPage - 1);
-            });
-            paginationControls.appendChild(prevLi);
-
-            let maxVisibleButtons = 5;
-            let startPage = Math.max(1, currentPage - Math.floor(maxVisibleButtons / 2));
-            let endPage = Math.min(totalPages, startPage + maxVisibleButtons - 1);
-
-            if (endPage - startPage + 1 < maxVisibleButtons) {
-                startPage = Math.max(1, endPage - maxVisibleButtons + 1);
-            }
-
-            if (startPage > 1) {
-                const firstLi = document.createElement('li');
-                firstLi.className = `page-item`;
-                firstLi.innerHTML = `<a class="page-link shadow-sm" href="#" aria-label="Halaman pertama">1</a>`;
-                firstLi.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    renderPage(1);
-                });
-                paginationControls.appendChild(firstLi);
-
-                if (startPage > 2) {
-                    const dots = document.createElement('li');
-                    dots.className = `page-item disabled`;
-                    dots.innerHTML = `<span class="page-link shadow-sm border-0 text-muted">...</span>`;
-                    paginationControls.appendChild(dots);
-                }
-            }
-
-            for (let i = startPage; i <= endPage; i++) {
-                const li = document.createElement('li');
-                li.className = `page-item ${i === currentPage ? 'active' : ''}`;
-                li.innerHTML = `<a class="page-link shadow-sm" href="#" ${i === currentPage ? 'aria-current="page"' : ''}>${i}</a>`;
-                li.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    renderPage(i);
-                });
-                paginationControls.appendChild(li);
-            }
-
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    const dots = document.createElement('li');
-                    dots.className = `page-item disabled`;
-                    dots.innerHTML = `<span class="page-link shadow-sm border-0 text-muted">...</span>`;
-                    paginationControls.appendChild(dots);
-                }
-                const lastLi = document.createElement('li');
-                lastLi.className = `page-item`;
-                lastLi.innerHTML = `<a class="page-link shadow-sm" href="#" aria-label="Halaman terakhir">${totalPages}</a>`;
-                lastLi.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    renderPage(totalPages);
-                });
-                paginationControls.appendChild(lastLi);
-            }
-
-            const nextLi = document.createElement('li');
-            nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-            nextLi.innerHTML = currentPage === totalPages ?
-                `<span class="page-link shadow-sm rounded-end-pill" aria-hidden="true">&raquo;</span>` :
-                `<a class="page-link shadow-sm rounded-end-pill" href="#" aria-label="Halaman berikutnya">&raquo;</a>`;
-            nextLi.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (currentPage < totalPages) renderPage(currentPage + 1);
-            });
-            paginationControls.appendChild(nextLi);
-        }
-
-        const searchInput = document.getElementById('searchInput');
-        const filterStatus = document.getElementById('filterStatus');
-        const filterCurrency = document.getElementById('filterCurrency');
-
-        window.applyFilters = function() {
-            const keyword = searchInput ? searchInput.value.toLowerCase() : '';
-            const statusVal = filterStatus ? filterStatus.value.toLowerCase() : '';
-            const currencyVal = filterCurrency ? filterCurrency.value.toLowerCase() : '';
-
-            filteredItems = allItems.filter(item => {
-                const nama = item.getAttribute('data-nama') || '';
-                const idhfm = item.getAttribute('data-idhfm') || '';
-                const nowa = item.getAttribute('data-nowa') || '';
-                const telegram = item.getAttribute('data-idtelegram') || '';
-                const email = item.getAttribute('data-email') || '';
-                const campaign = item.getAttribute('data-campaign') || '';
-                const status = (item.getAttribute('data-status') || '').toLowerCase();
-                const currency = (item.getAttribute('data-currency') || '').toLowerCase();
-
-                const matchText = nama.includes(keyword) || idhfm.includes(keyword) || nowa.includes(keyword) || telegram.includes(keyword) || email.includes(keyword) || campaign.includes(keyword);
-                const matchStatus = statusVal === '' || status === statusVal;
-                const matchCurrency = currencyVal === '' || currency === currencyVal;
-
-                return matchText && matchStatus && matchCurrency;
-            });
-
-            renderPage(1);
+        const esc = value => $('<div>').text(value ?? '').html();
+        const money = (value, currency) => {
+            if (value === null || value === '' || value === undefined || Number.isNaN(Number(value))) return 'Belum tersinkron';
+            return `${esc(currency || 'USD')} ${Number(value).toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         };
-
-        if (searchInput) searchInput.addEventListener('input', window.applyFilters);
-        if (filterStatus) filterStatus.addEventListener('change', window.applyFilters);
-        if (filterCurrency) filterCurrency.addEventListener('change', window.applyFilters);
-
-        renderPage(1);
-
+        const dateLabel = value => {
+            if (!value || value === '0000-00-00 00:00:00') return '<span class="badge bg-light border text-muted rounded-pill">Belum Trading</span>';
+            const date = new Date(String(value).replace(' ', 'T'));
+            return Number.isNaN(date.getTime()) ? esc(value) : `<span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill"><i class="bi bi-graph-up me-1"></i>${date.toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'})}</span>`;
+        };
+        const table = $('#membersDataTable').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            order: [[0, 'asc']],
+            searching: true,
+            dom: '<"row mb-3 align-items-center"<"col-md-6"l><"col-md-6 text-md-end">>rt<"row mt-3 align-items-center"<"col-md-6"i><"col-md-6"p>>',
+            language: { url: "<?= base_url('assets/vendor/datatables/i18n/id.json') ?>", search: 'Cari:' },
+            ajax: {
+                url: "<?= base_url('AdminDashboard/membersDataTables') ?>",
+                data: function(d) {
+                    d.status = $('#filterStatus').val() || '';
+                    d.currency = $('#filterCurrency').val() || '';
+                }
+            },
+            columns: [
+                {data: null, className: 'text-center', render: row => `<div class="member-identity-stack"><div class="member-identity-name">${esc(row.nama || 'Member BOSSCUAN')}</div><div><span class="member-identity-label">ID HFM</span><span class="member-identity-value">${esc(row.id_hfm)}</span></div><div><span class="member-identity-label">WHATSAPP</span><span class="member-identity-value">${esc(row.no_wa || '-')}</span></div><div><span class="member-identity-label">TELEGRAM</span><span class="member-identity-value">${esc(row.id_telegram || '-')}</span></div><div><span class="member-identity-label">EMAIL</span><span class="member-identity-value">${esc(row.email || '-')}</span></div></div>`},
+                {data: null, className: 'text-end text-nowrap', render: row => money(row.deposit, row.currency)},
+                {data: null, className: 'text-end text-nowrap', render: row => money(row.withdrawals, row.currency)},
+                {data: 'last_trade', className: 'text-center text-nowrap', render: data => dateLabel(data)},
+                {data: 'status', className: 'text-center', render: data => data === 'aktif' ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Aktif</span>' : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Lepas IB</span>'},
+                {data: 'currency', className: 'text-center', render: data => `<span class="badge bg-primary-subtle text-primary rounded-pill">${esc(data || 'USD')}</span>`},
+                {data: 'campaign', render: data => `<span class="text-break">${esc(data || '-')}</span>`},
+                {data: null, orderable: false, searchable: false, render: row => {
+                    const id = esc(row.id_hfm), name = esc(row.nama || 'Member BOSSCUAN');
+                    const invite = row.status === 'aktif' && /^[1-9][0-9]{4,19}$/.test(String(row.id_telegram || ''))
+                        ? `<form method="post" action="<?= base_url('AdminDashboard/resendTelegramInvite') ?>" class="d-inline"><input type="hidden" name="<?= csrf_token() ?>" value="<?= csrf_hash() ?>"><input type="hidden" name="id_hfm" value="${id}"><button type="submit" class="btn btn-outline-info btn-sm" title="Kirim ulang invite"><i class="bi bi-send"></i></button></form>` : '';
+                    return `<div class="d-flex gap-1 flex-wrap"><button class="btn btn-outline-warning btn-sm btn-edit" data-id="${id}" data-wa="${esc(row.no_wa)}" data-currency="${esc(row.currency || 'USD')}" data-deposit="${esc(row.deposit)}" data-status="${esc(row.status)}" data-trade="${esc(row.last_trade || '')}" title="Edit"><i class="bi bi-pencil-square"></i></button><button class="btn btn-outline-primary btn-sm btn-sync-single" onclick="syncData(this, '${id}')" title="Sinkronisasi data"><i class="bi bi-arrow-repeat"></i></button>${invite}<button class="btn btn-outline-danger btn-sm btn-hapus" data-id="${id}" data-nama="${name}" data-bs-toggle="modal" data-bs-target="#modalHapus" title="Hapus"><i class="bi bi-trash3"></i></button></div>`;
+                }}
+            ],
+            createdRow: function(row, data) {
+                const labels = ['Identitas Member', 'Deposit', 'Withdrawals', 'Terakhir Trading', 'Status IB', 'Akun', 'Campaign', 'Aksi'];
+                $(row).addClass('member-item').attr({'data-idhfm': data.id_hfm, 'data-status': data.status, 'data-currency': data.currency || 'USD'});
+                $(row).children('td').each(function(index) { $(this).attr('data-label', labels[index] || ''); });
+            }
+        });
+        window.memberTable = table;
+        window.getFilteredItems = () => table.rows({search: 'applied'}).nodes().toArray();
+        window.applyFilters = () => table.ajax.reload(null, true);
+        $('#filterStatus, #filterCurrency').on('change', () => table.ajax.reload());
+        $('#searchInput').on('input', function() { table.search(this.value).draw(); });
         const formEdit = document.getElementById('formEditMember');
         if (formEdit) {
             formEdit.addEventListener('submit', async function(e) {

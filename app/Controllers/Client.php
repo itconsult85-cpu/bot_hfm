@@ -582,6 +582,9 @@ class Client extends BaseController
         $balance       = (float) ($data['balance'] ?? 0);
         $equity        = (float) ($data['equity'] ?? 0);
         $deposit = max($deposit_murni, $balance, $equity);
+        $withdrawals = array_key_exists('withdrawals', $data) && is_numeric($data['withdrawals'])
+            ? (float) $data['withdrawals']
+            : null;
         $nama = $data['name'] ?? 'Member BOSSCUAN';
         $emailHfm = trim((string) ($data['email'] ?? ''));
         $campaignHfm = trim((string) ($data['campaign'] ?? ''));
@@ -638,6 +641,9 @@ class Client extends BaseController
                     'deposit'    => $deposit,
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
+                if ($db->fieldExists('withdrawals', 'tb_member_vip')) {
+                    $updateMember['withdrawals'] = $withdrawals;
+                }
                 if ($emailHfm !== '') $updateMember['email'] = $emailHfm;
                 if ($campaignHfm !== '') $updateMember['campaign'] = $campaignHfm;
                 $db->table('tb_member_vip')->where('id', $memberLepasIb['id'])->update($updateMember);
@@ -649,7 +655,7 @@ class Client extends BaseController
                     'tipe_aktivitas' => 'aktif_kembali'
                 ]);
             } else {
-                $db->table('tb_member_vip')->insert([
+                $memberData = [
                     'id_hfm'     => $id_hfm,
                     'no_wa'      => $no_wa,
                     'nama'       => $nama,
@@ -660,7 +666,11 @@ class Client extends BaseController
                     'status'     => 'aktif',
                     'last_trade' => $last_trade,
                     'created_at' => date('Y-m-d H:i:s')
-                ]);
+                ];
+                if ($db->fieldExists('withdrawals', 'tb_member_vip')) {
+                    $memberData['withdrawals'] = $withdrawals;
+                }
+                $db->table('tb_member_vip')->insert($memberData);
                 $db->table('tb_member_logs')->insert([
                     'no_wa'          => $no_wa,
                     'nama'           => $nama,
@@ -722,6 +732,7 @@ class Client extends BaseController
 
         // API HFM wajib berhasil agar pendaftaran tidak dapat melewati validasi minimum.
         $deposit_real = 0;
+        $withdrawals_real = null;
         $currency_real = 'USD';
         $last_trade_real = '0000-00-00 00:00:00';
         $nama_real = $nama_form;
@@ -752,6 +763,9 @@ class Client extends BaseController
                 $bal    = (float)($dataApi['balance'] ?? 0);
                 $equity = (float)($dataApi['equity'] ?? 0);
                 $deposit_real = max($depo, $bal, $equity);
+                $withdrawals_real = array_key_exists('withdrawals', $dataApi) && is_numeric($dataApi['withdrawals'])
+                    ? (float) $dataApi['withdrawals']
+                    : null;
 
                 // Ambil mata uang (USD, USC, IDR)
                 $currency_real = $dataApi['account_currency'] ?? 'USD';
@@ -791,7 +805,7 @@ class Client extends BaseController
         }
 
         // 4. SIMPAN DATA KE DATABASE DENGAN DATA ASLI API
-        $db->table('tb_member_vip')->insert([
+        $memberData = [
             'id_hfm'      => $id_hfm,
             'no_wa'       => $no_wa,
             'nama'        => $nama_real,
@@ -805,7 +819,11 @@ class Client extends BaseController
             'status'      => 'aktif',
             'last_trade'  => $last_trade_real,
             'created_at'  => date('Y-m-d H:i:s')
-        ]);
+        ];
+        if ($db->fieldExists('withdrawals', 'tb_member_vip')) {
+            $memberData['withdrawals'] = $withdrawals_real;
+        }
+        $db->table('tb_member_vip')->insert($memberData);
 
         $db->table('tb_member_logs')->insert([
             'no_wa'          => $no_wa,

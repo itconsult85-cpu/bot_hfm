@@ -27,6 +27,7 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
 
     // Admin Dashboard
     $routes->get('AdminDashboard', 'AdminDashboard::index');
+    $routes->get('AdminDashboard/membersDataTables', 'AdminDashboard::membersDataTables');
     $routes->get('activity-reminders', 'ActivityReminder::index');
     $routes->post('activity-reminders/process', 'ActivityReminder::process');
     $routes->get('activity-reminders/remove/(:num)', 'ActivityReminder::remove/$1');
@@ -76,6 +77,7 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
 
     $routes->get('admin/member-logs', 'AdminDashboard::memberLogs');
     $routes->get('AdminDashboard/memberLogs', 'AdminDashboard::memberLogs');
+    $routes->get('AdminDashboard/memberLogsDataTables', 'AdminDashboard::memberLogsDataTables');
     $routes->get('admin/help-sessions', 'AdminDashboard::adminHelpSessions');
     $routes->get('AdminDashboard/exportKickedMembers', 'AdminDashboard::exportKickedMembers');
     $routes->post('AdminDashboard/kickLepasIbMembers', 'AdminDashboard::kickLepasIbMembers');
