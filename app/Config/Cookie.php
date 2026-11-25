@@ -54,7 +54,10 @@ class Cookie extends BaseConfig
      *
      * Cookie will only be set if a secure HTTPS connection exists.
      */
-    public bool $secure = (ENVIRONMENT === 'production');
+    // A Secure cookie is rejected by browsers when the site is served over HTTP.
+    // Detect the actual request scheme so production deployments using an IP/HTTP
+    // URL can still create a session. HTTPS deployments remain protected.
+    public bool $secure = false;
 
     /**
      * --------------------------------------------------------------------------
@@ -104,4 +107,14 @@ class Cookie extends BaseConfig
      * @see https://tools.ietf.org/html/rfc2616#section-2.2
      */
     public bool $raw = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $https = (string) ($_SERVER['HTTPS'] ?? '');
+        $this->secure = $https !== ''
+            && strtolower($https) !== 'off'
+            && $https !== '0';
+    }
 }

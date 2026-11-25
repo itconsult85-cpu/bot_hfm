@@ -121,6 +121,7 @@ app.post("/reset-user", async (req, res) => {
     delete userMessages[userId];
     vipNotified.delete(userId);
     validatedUsers.delete(userId);
+    walletFallbackUsers.delete(String(userId));
 
     if (userTimeouts[userId]) {
       clearTimeout(userTimeouts[userId].timeout);
@@ -239,6 +240,7 @@ const userMessages = {};
 const userTempData = {};
 const vipNotified = new Set();
 const validatedUsers = new Set();
+const walletFallbackUsers = new Set();
 
 const antrianBot = [];
 let sedangAntriBot = false;
@@ -2192,23 +2194,32 @@ async function initTelegramBot() {
             const adminIdDb = botSettings.globals.ID_ADMIN || "";
             const isAdmin = userId.toString() === adminIdDb.toString().trim();
             const idTrading = idTradingMatch[0];
+            const isWalletFallback =
+              !isAdmin && walletFallbackUsers.has(String(userId));
 
             const loadText = isAdmin
               ? `👨‍💻 Siap Min! Mengecek status ID Trading (${idTrading}) ke server...`
-              : `Mengecek ID Trading (${idTrading}) ke server, tunggu sebentar ya kak ${userName}... ⏳`;
+              : isWalletFallback
+                ? `Mengecek Wallet ID (${idTrading}) dan akun trading di dalamnya ke server, tunggu sebentar ya kak ${userName}... ⏳`
+                : `Mengecek ID Trading (${idTrading}) ke server, tunggu sebentar ya kak ${userName}... ⏳`;
 
             const sentLoadMsg = await ctx.reply(loadText);
             await saveChatLog(userId, "bot", loadText);
 
             const apiUserId = isAdmin ? "ADMIN_CHECK" : "CHECK_ONLY";
+            const apiPath = isWalletFallback
+              ? `cekWalletHfm/${idTrading}/${apiUserId}`
+              : `cekHfm/${idTrading}/${apiUserId}`;
 
             try {
               const resCek = await axios.get(
-                `http://103.89.4.144/bot_wa/client/cekHfm/${idTrading}/${apiUserId}`,
+                `http://103.89.4.144/bot_wa/client/${apiPath}`,
               );
               let finalMsg = "";
 
               if (resCek.data.status === "valid_sempurna") {
+                const verifiedId = resCek.data.id_hfm || idTrading;
+                walletFallbackUsers.delete(String(userId));
                 if (isAdmin) {
                   const adminInfo = resCek.data.admin_info || {};
                   finalMsg =
@@ -2223,8 +2234,10 @@ async function initTelegramBot() {
                   );
                 } else {
                   userSteps[userId] = 7;
-                  userTempData[userId] = idTrading;
-                  finalMsg = `✅ **Selamat kak ${userName}!**\n\nID akun trading (${idTrading}) sudah terverifikasi dan berada di bawah BO$$CUAN 🎉\n\nSekarang silakan lengkapi data Kakak di bawah ini:\n\nNama :\nNo wa aktif :\nemail :\n\n_(Copy tulisan di atas, isi, lalu kirim ke sini agar kami bisa mengundang Kakak ke grup VIP Warga Avatar)_`;
+                  userTempData[userId] = verifiedId;
+                  finalMsg = isWalletFallback
+                    ? `✅ **Selamat kak ${userName}!**\n\nWallet ID (${idTrading}) terverifikasi. Salah satu ID trading aktif (${verifiedId}) di dalam wallet tersebut lolos validasi dan berada di bawah BO$$CUAN 🎉\n\nSekarang silakan lengkapi data Kakak di bawah ini:\n\nNama :\nNo wa aktif :\nemail :\n\n_(Copy tulisan di atas, isi, lalu kirim ke sini agar kami bisa mengundang Kakak ke grup VIP Warga Avatar)_`
+                    : `✅ **Selamat kak ${userName}!**\n\nID akun trading (${idTrading}) sudah terverifikasi dan berada di bawah BO$$CUAN 🎉\n\nSekarang silakan lengkapi data Kakak di bawah ini:\n\nNama :\nNo wa aktif :\nemail :\n\n_(Copy tulisan di atas, isi, lalu kirim ke sini agar kami bisa mengundang Kakak ke grup VIP Warga Avatar)_`;
                   await ctx.telegram.editMessageText(
                     ctx.chat.id,
                     sentLoadMsg.message_id,
@@ -2258,6 +2271,12 @@ async function initTelegramBot() {
                   ? `❌ *[ADMIN INFO]*\nID \`${idTrading}\` *TIDAK VALID* atau tidak terdaftar di IB kita.`
                   : resCek.data.pesan ||
                     "❌ ID Tidak Valid atau belum masuk di bawah IB BOSSCUAN.";
+              }
+
+              if (!isAdmin && resCek.data.status !== "valid_sempurna") {
+                walletFallbackUsers.add(String(userId));
+                finalMsg +=
+                  "\n\n💡 Jika ID Trading ini gagal diverifikasi, coba kirim **Wallet ID** Kakak sebagai opsi kedua. Satu Wallet ID dapat berisi beberapa ID Trading aktif.";
               }
 
               await ctx.telegram.editMessageText(
@@ -2329,6 +2348,7 @@ async function initTelegramBot() {
                   if (resCek.data.status === "valid_sempurna") {
                     userSteps[userId] = 7;
                     userTempData[userId] = detectedId;
+                    walletFallbackUsers.delete(String(userId));
                     const finalMsg = `✅ **Selamat kak ${userName}!**\n\nID akun trading (${detectedId}) sudah lolos verifikasi dan deposit masuk under BO$$CUAN 🎉\n\nSekarang silakan lengkapi data Kakak di bawah ini:\n\nNama :\nNo wa aktif :\nemail :\n\n_(Copy tulisan di atas, isi, lalu kirim ke sini untuk mendapatkan link VIP)_`;
 
                     await ctx.telegram.editMessageText(
@@ -2355,7 +2375,8 @@ async function initTelegramBot() {
                       { parse_mode: "Markdown" },
                     );
                   } else {
-                    const invalidMsg = `❌ Maaf kak ${userName}, ID Trading ${detectedId} belum terdaftar di bawah IB kita.\n\nJika Kakak belum pindah IB, yuk ikuti panduan berikut:\n\nLogin via Web: http://hftidtrade.com\n\nCara Pindah IB:\n1. Klik Dompet Saya\n2. Klik Aksi Wallet\n3. Klik set ID Mitra & Kampanye\n4. Ketik g0olqxh5h3\n5. Klik Tambah & tetapkan Ulang.\n\n[VIDEO: pindah_ib]`;
+                    walletFallbackUsers.add(String(userId));
+                    const invalidMsg = `❌ Maaf kak ${userName}, ID Trading ${detectedId} belum terdaftar di bawah IB kita.\n\n💡 Jika Kakak memiliki Wallet ID, kirim angka Wallet ID tersebut sebagai opsi kedua. Satu Wallet ID dapat berisi beberapa ID Trading aktif.\n\nJika Kakak belum pindah IB, yuk ikuti panduan berikut:\n\nLogin via Web: http://hftidtrade.com\n\nCara Pindah IB:\n1. Klik Dompet Saya\n2. Klik Aksi Wallet\n3. Klik set ID Mitra & Kampanye\n4. Ketik g0olqxh5h3\n5. Klik Tambah & tetapkan Ulang.\n\n[VIDEO: pindah_ib]`;
                     await ctx.telegram
                       .deleteMessage(ctx.chat.id, cekMsg.message_id)
                       .catch(() => {});
@@ -2466,6 +2487,8 @@ async function initTelegramBot() {
           // 4. RESET / START COMMAND & FILTER MEMORI
           if (textMessage === "/start" || textMessage === "/reset") {
             userSteps[userId] = 1;
+            delete userTempData[userId];
+            walletFallbackUsers.delete(String(userId));
             const welcomeTemplate =
               botSettings.globals.KATA_SAPAAN ||
               `Halo Kak {NAMA_USER}, Selamat datang di layanan pendaftaran VIP!\nApakah Kakak berminat untuk bergabung ke grup kita?`;
