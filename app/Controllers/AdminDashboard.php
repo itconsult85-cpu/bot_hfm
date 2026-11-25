@@ -150,7 +150,8 @@ class AdminDashboard extends BaseController
         $request = $this->request;
         $db = \Config\Database::connect();
         $hasWithdrawals = $db->fieldExists('withdrawals', 'tb_member_vip');
-        $columns = [0 => 'nama', 1 => 'deposit', 2 => $hasWithdrawals ? 'withdrawals' : 'id', 3 => 'last_trade', 4 => 'status', 5 => 'currency', 6 => 'campaign', 7 => 'id'];
+        $hasVolume = $db->fieldExists('volume', 'tb_member_vip');
+        $columns = [0 => 'nama', 1 => 'deposit', 2 => $hasVolume ? 'volume' : 'id', 3 => $hasWithdrawals ? 'withdrawals' : 'id', 4 => 'last_trade', 5 => 'status', 6 => 'currency', 7 => 'campaign', 8 => 'created_at', 9 => 'id'];
         $total = $db->table('tb_member_vip')->countAllResults();
         $searchParams = $request->getGet('search') ?? [];
         $search = trim((string) ($searchParams['value'] ?? ''));
@@ -170,7 +171,9 @@ class AdminDashboard extends BaseController
         $orderIndex = (int) ($order[0]['column'] ?? 0);
         $orderDir = strtolower((string) ($order[0]['dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
         $orderColumn = $columns[$orderIndex] ?? 'created_at';
-        $dataBuilder = $db->table('tb_member_vip')->select('id, id_hfm, no_wa, nama, email, id_telegram, deposit, currency, status, last_trade, campaign, created_at');
+        $selectColumns = 'id, id_hfm, no_wa, nama, email, id_telegram, deposit, currency, status, last_trade, campaign, created_at';
+        if ($hasVolume) $selectColumns .= ', volume';
+        $dataBuilder = $db->table('tb_member_vip')->select($selectColumns);
         if ($hasWithdrawals) $dataBuilder->select('withdrawals', false);
         $applyFilters($dataBuilder);
         $startRow = max(0, (int) ($request->getGet('start') ?? 0));
@@ -1461,6 +1464,10 @@ class AdminDashboard extends BaseController
                     $last_trade_real = date('Y-m-d H:i:s', strtotime(substr($raw_last_trade, 0, 19)));
                 }
 
+                $volume_real = array_key_exists('volume', $dataApi) && is_numeric($dataApi['volume'])
+                    ? (float) $dataApi['volume']
+                    : null;
+
                 $updateData = [
                     'nama'       => $dataApi['name'] ?? 'Member BOSSCUAN',
                     'currency'   => $dataApi['account_currency'] ?? 'USD',
@@ -1478,6 +1485,9 @@ class AdminDashboard extends BaseController
                 }
                 if ($db->fieldExists('withdrawals', 'tb_member_vip')) {
                     $updateData['withdrawals'] = $withdrawals_real;
+                }
+                if ($db->fieldExists('volume', 'tb_member_vip')) {
+                    $updateData['volume'] = $volume_real;
                 }
 
                 // PENCATATAN LOG: Jika status berubah jadi aktif
