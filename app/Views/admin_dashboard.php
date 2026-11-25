@@ -116,8 +116,8 @@
             <tr>
                 <th class="text-center">Identitas Member</th>
                 <th class="text-end">Deposit</th>
-                <th class="text-end">Withdrawals</th>
                 <th class="text-end">Volume</th>
+                <th class="text-end">Withdrawals</th>
                 <th class="text-center">Terakhir Trading</th>
                 <th class="text-center">Status IB</th>
                 <th class="text-center">Akun</th>
