@@ -2624,7 +2624,13 @@ async function initTelegramBot() {
     });
 
     bot.action("request_vip_invite", async (ctx) => {
-      await ctx.answerCbQuery();
+      // Jangan hentikan proses retry hanya karena callback query sudah kedaluwarsa
+      // atau Telegram gagal mengonfirmasi tampilan tombol.
+      try {
+        await ctx.answerCbQuery();
+      } catch (callbackError) {
+        console.warn("[INVITE CALLBACK ACK ERROR]", callbackError.message);
+      }
       await handleVipInviteRequest(ctx);
     });
 

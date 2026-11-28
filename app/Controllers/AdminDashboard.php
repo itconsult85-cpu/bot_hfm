@@ -39,8 +39,9 @@ class AdminDashboard extends BaseController
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         $data = json_decode($raw ?: '', true);
+        $isSuccessfulResponse = is_array($data) && (($data['status'] ?? null) === 'success');
         return [
-            'ok' => !$error && $httpCode >= 200 && $httpCode < 300 && (($data['status'] ?? null) === 'success' || $httpCode === 200),
+            'ok' => !$error && $httpCode >= 200 && $httpCode < 300 && $isSuccessfulResponse,
             'message' => $error ?: ($data['message'] ?? $data['error'] ?? ('HTTP ' . $httpCode)),
         ];
     }

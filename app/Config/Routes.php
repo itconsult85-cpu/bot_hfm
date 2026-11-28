@@ -58,8 +58,6 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->get('AdminDashboard/campaignTrades', 'AdminDashboard::campaignTrades');
     $routes->get('AdminDashboard/campaigns', 'AdminDashboard::campaigns');
     $routes->get('AdminDashboard/campaignRawClicks', 'AdminDashboard::campaignRawClicks');
-    $routes->get('hfm-demo-client', 'HfmDemo::index');
-    $routes->post('hfm-demo-client/check', 'HfmDemo::check');
 
     // CRUD link grup Telegram & WhatsApp
     $routes->get('bot-group-links', 'BotGroupLink::index');
@@ -131,7 +129,6 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
 
 $routes->get('client', 'Client::index');
 $routes->get('client/check_status_vip/(:any)', 'Client::check_status_vip/$1');
-$routes->get('client/cekWalletHfm/(:any)/(:any)', 'Client::cekWalletHfm/$1/$2');
 $routes->get('client/getPanduanMedia/(:any)', 'Client::getPanduanMedia/$1');
 $routes->get('client/cekHfm/(:any)/(:any)', 'Client::cekHfm/$1/$2');
 $routes->get('client/apiGetPasif', 'Client::apiGetPasif');

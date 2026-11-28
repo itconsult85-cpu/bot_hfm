@@ -19,8 +19,7 @@ $isHfmApi = strpos($uri, 'AdminDashboard/overallPerformance') === 0
     || strpos($uri, 'AdminDashboard/campaign-wallets') === 0
     || strpos($uri, 'AdminDashboard/campaignTrades') === 0
     || strpos($uri, 'AdminDashboard/campaignRawClicks') === 0
-    || strpos($uri, 'client-acid-code-modification') === 0
-    || strpos($uri, 'hfm-demo-client') === 0;
+    || strpos($uri, 'client-acid-code-modification') === 0;
 ?>
 
 <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
@@ -139,13 +138,6 @@ $isHfmApi = strpos($uri, 'AdminDashboard/overallPerformance') === 0
                                 class="nav-link <?= strpos($uri, 'client-acid-code-modification/trading-account') === 0 ? 'active' : '' ?>">
                                 <i class="nav-icon bi bi-circle"></i>
                                 <p>Modifikasi ACID Trading Account</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="<?= base_url('hfm-demo-client') ?>"
-                                class="nav-link <?= strpos($uri, 'hfm-demo-client') === 0 ? 'active' : '' ?>">
-                                <i class="nav-icon bi bi-circle"></i>
-                                <p>HFM Demo Client</p>
                             </a>
                         </li>
                     </ul>
