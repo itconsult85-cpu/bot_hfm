@@ -1240,8 +1240,34 @@ function adminHelpKeyboard() {
   return {
     keyboard: [[{ text: "🆘 Tolong saya admin" }]],
     resize_keyboard: true,
-    one_time_keyboard: false,
+    one_time_keyboard: true,
   };
+}
+
+function adminHelpActionKeyboard(userId, currentStep) {
+  const targetId = String(userId || "").trim();
+  const step = Number(currentStep) || 1;
+  return {
+    inline_keyboard: [
+      [{ text: "📖 Kirim panduan tahap", callback_data: `admin_help_guide:${targetId}:${step}` }],
+      [{ text: "📸 Minta screenshot", callback_data: `admin_help_screenshot:${targetId}` }],
+      [{ text: "🔗 Kirim link invite", callback_data: `admin_help_invite:${targetId}` }],
+      [{ text: "📨 Buka chat user", url: `tg://user?id=${encodeURIComponent(targetId)}` }],
+    ],
+  };
+}
+
+function getAdminHelpGuide(step) {
+  const guides = {
+    1: "Langkah awal:\n1. Pastikan Kakak sudah memiliki akun HFM.\n2. Kirim ID Trading HFM berupa angka ke bot.\n3. Tunggu sampai bot menyatakan ID valid sebelum melanjutkan pendaftaran.",
+    2: "Langkah pendaftaran:\n1. Setelah ID Trading valid, isi Nama, No WA aktif, dan Email.\n2. Kirim dalam satu pesan dengan format:\nNama: ...\nNo WA: ...\nEmail: ...\n3. Pastikan data sesuai dengan data akun.",
+    3: "Mohon kirim screenshot halaman akun HFM yang menampilkan ID Trading dengan jelas. Pastikan angka ID tidak terpotong dan gambar tidak buram.",
+    4: "Langkah pindah IB:\n1. Login melalui http://hftidtrade.com\n2. Buka Dompet Saya.\n3. Pilih Aksi Wallet.\n4. Pilih Set ID Mitra & Kampanye.\n5. Isi ID Mitra & Kampanye: g0olqxh5h3\n6. Pilih Tambah, lalu Tetapkan Ulang.\nSetelah berhasil, kirim screenshot buktinya ke bot.",
+    5: "Langkah arsip akun:\n1. Buka akun trading di platform HFM.\n2. Ikuti panduan arsip akun yang sudah diberikan bot.\n3. Setelah selesai, kirim screenshot hasilnya agar dapat diperiksa.",
+    6: "Langkah MT5/deposit:\n1. Pastikan akun trading sudah dapat dibuka di MT5.\n2. Pastikan deposit memenuhi minimum yang dipersyaratkan.\n3. Jika sudah, kirim ID Trading kembali ke bot untuk pengecekan.",
+    7: "Data sudah tervalidasi. Silakan isi formulir dengan Nama, No WA aktif, dan Email. Setelah tersimpan, bot akan mengirim link invite Grup VIP jika akun belum menjadi anggota.",
+  };
+  return guides[Number(step)] || guides[1];
 }
 
 function adminMemberStatusLabel(status) {
@@ -1535,11 +1561,7 @@ async function sendAdminHelpReport(ctx, userId, userName, currentStep) {
 
   try {
     await bot.telegram.sendMessage(adminId, report, {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "📨 Buka chat user", url: userProfileLink }],
-        ],
-      },
+      reply_markup: adminHelpActionKeyboard(userId, currentStep),
     });
   } catch (error) {
     console.error("[ADMIN HELP REPORT ERROR]", error.message);
@@ -2632,6 +2654,49 @@ async function initTelegramBot() {
         console.warn("[INVITE CALLBACK ACK ERROR]", callbackError.message);
       }
       await handleVipInviteRequest(ctx);
+    });
+
+    bot.action(/^admin_help_(guide|screenshot|invite):(\d{5,20})(?::(\d+))?$/, async (ctx) => {
+      const adminId = String(botSettings.globals.ID_ADMIN || "").trim();
+      if (String(ctx.from?.id || "") !== adminId) {
+        return ctx.answerCbQuery("Menu ini hanya untuk admin.", { show_alert: true });
+      }
+
+      const action = ctx.match[1];
+      const targetTelegramId = String(ctx.match[2]);
+      const step = Number(ctx.match[3] || 1);
+      await ctx.answerCbQuery();
+
+      try {
+        if (action === "guide") {
+          await bot.telegram.sendMessage(
+            targetTelegramId,
+            `Panduan dari admin:\n\n${getAdminHelpGuide(step)}\n\nJika masih terkendala, balas pesan ini dengan menjelaskan bagian yang belum berhasil.`,
+          );
+          return ctx.reply(`Panduan tahap ${step} berhasil dikirim ke user ${targetTelegramId}.`);
+        }
+
+        if (action === "screenshot") {
+          await bot.telegram.sendMessage(
+            targetTelegramId,
+            "Mohon kirim screenshot bagian yang sedang bermasalah ke chat bot ini. Pastikan tulisan dan ID terlihat jelas agar admin dapat membantu.",
+          );
+          return ctx.reply(`Permintaan screenshot berhasil dikirim ke user ${targetTelegramId}.`);
+        }
+
+        const inviteResult = await sendTrackedTelegramInvite({
+          telegramId: targetTelegramId,
+          source: "admin",
+          bypassCooldown: true,
+        });
+        if (inviteResult.status === "sent") {
+          return ctx.reply(`Link invite berhasil dikirim ke user ${targetTelegramId}.`);
+        }
+        return ctx.reply(inviteResult.message || "Link invite belum dapat dikirim ke user.");
+      } catch (error) {
+        console.error("[ADMIN HELP ACTION ERROR]", error.message);
+        return ctx.reply("Aksi bantuan gagal dijalankan. Pastikan user belum memblokir bot dan coba lagi.");
+      }
     });
 
     bot.on("new_chat_members", async (ctx) => {
